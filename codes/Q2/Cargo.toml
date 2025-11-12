@@ -1,0 +1,12 @@
+[package]
+name = "q2_filter_design"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+num-complex = "0.4"
+plotters = "=0.3.5"
+
+[[bin]]
+name = "q2"
+path = "main.rs"

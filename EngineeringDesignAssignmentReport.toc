@@ -1,28 +1,95 @@
 \contentsline {section}{报告撰写说明}{1}{Doc-Start}%
-\contentsline {section}{\numberline {1}问题描述}{3}{section.1}%
-\contentsline {section}{\numberline {2}理论模型}{4}{section.2}%
-\contentsline {subsection}{\numberline {2.1}原理分析与设计思路}{4}{subsection.2.1}%
-\contentsline {subsubsection}{\numberline {2.1.1}调幅信号的数学表示}{4}{subsubsection.2.1.1}%
-\contentsline {subsubsection}{\numberline {2.1.2}相干解调原理}{4}{subsubsection.2.1.2}%
-\contentsline {subsubsection}{\numberline {2.1.3}频率偏差的影响}{4}{subsubsection.2.1.3}%
-\contentsline {subsubsection}{\numberline {2.1.4}二次解调的设计思路}{5}{subsubsection.2.1.4}%
-\contentsline {subsection}{\numberline {2.2}数学模型}{5}{subsection.2.2}%
-\contentsline {subsubsection}{\numberline {2.2.1}信号频谱模型}{5}{subsubsection.2.2.1}%
-\contentsline {subsubsection}{\numberline {2.2.2}滤波器设计模型}{5}{subsubsection.2.2.2}%
-\contentsline {subsubsection}{\numberline {2.2.3}解调过程的数学描述}{6}{subsubsection.2.2.3}%
-\contentsline {subsubsection}{\numberline {2.2.4}系统特性分析}{6}{subsubsection.2.2.4}%
-\contentsline {section}{\numberline {3}程序设计}{6}{section.3}%
-\contentsline {subsection}{\numberline {3.1}编程思路}{6}{subsection.3.1}%
-\contentsline {subsubsection}{\numberline {3.1.1}Q1：频谱分析与频率偏差估计的编程思路}{7}{subsubsection.3.1.1}%
-\contentsline {subsubsection}{\numberline {3.1.2}Q2：滤波器设计的编程思路}{7}{subsubsection.3.1.2}%
-\contentsline {subsubsection}{\numberline {3.1.3}Q3：时域解调方法的编程思路}{8}{subsubsection.3.1.3}%
-\contentsline {subsubsection}{\numberline {3.1.4}Q4：频域解调方法的编程思路}{8}{subsubsection.3.1.4}%
-\contentsline {subsubsection}{\numberline {3.1.5}程序模块划分}{9}{subsubsection.3.1.5}%
-\contentsline {subsection}{\numberline {3.2}主要流程图及说明}{9}{subsection.3.2}%
-\contentsline {subsection}{\numberline {3.3}结果分析}{10}{subsection.3.3}%
-\contentsline {subsubsection}{\numberline {3.3.1}运行结果}{10}{subsubsection.3.3.1}%
-\contentsline {subsubsection}{\numberline {3.3.2}结果验证}{10}{subsubsection.3.3.2}%
-\contentsline {section}{\numberline {4}总结与体会}{10}{section.4}%
-\contentsline {section}{参考文献}{11}{section.4}%
-\contentsline {section}{\numberline {A}程序主要代码}{12}{appendix.A}%
-\contentsline {section}{附录 程序主要代码}{12}{appendix.A}%
+\contentsline {section}{\numberline {1}问题描述}{5}{section.1}%
+\contentsline {section}{\numberline {2}理论模型}{6}{section.2}%
+\contentsline {subsection}{\numberline {2.1}原理分析与设计思路}{6}{subsection.2.1}%
+\contentsline {subsubsection}{\numberline {2.1.1}调幅信号的数学表示}{6}{subsubsection.2.1.1}%
+\contentsline {subsubsection}{\numberline {2.1.2}相干解调原理}{6}{subsubsection.2.1.2}%
+\contentsline {subsubsection}{\numberline {2.1.3}频率偏差的影响}{6}{subsubsection.2.1.3}%
+\contentsline {subsubsection}{\numberline {2.1.4}二次解调的设计思路}{7}{subsubsection.2.1.4}%
+\contentsline {subsection}{\numberline {2.2}数学模型}{7}{subsection.2.2}%
+\contentsline {subsubsection}{\numberline {2.2.1}信号频谱模型}{7}{subsubsection.2.2.1}%
+\contentsline {subsubsection}{\numberline {2.2.2}滤波器设计模型}{7}{subsubsection.2.2.2}%
+\contentsline {subsubsection}{\numberline {2.2.3}解调过程的数学描述}{8}{subsubsection.2.2.3}%
+\contentsline {subsubsection}{\numberline {2.2.4}系统特性分析}{8}{subsubsection.2.2.4}%
+\contentsline {section}{\numberline {3}程序设计}{8}{section.3}%
+\contentsline {subsection}{\numberline {3.1}编程思路}{8}{subsection.3.1}%
+\contentsline {subsubsection}{\numberline {3.1.1}Q1：频谱分析与频率偏差估计的编程思路}{9}{subsubsection.3.1.1}%
+\contentsline {subsubsection}{\numberline {3.1.2}Q2：滤波器设计的编程思路}{9}{subsubsection.3.1.2}%
+\contentsline {subsubsection}{\numberline {3.1.3}Q3：时域解调方法的编程思路}{10}{subsubsection.3.1.3}%
+\contentsline {subsubsection}{\numberline {3.1.4}Q4：频域解调方法的编程思路}{10}{subsubsection.3.1.4}%
+\contentsline {subsubsection}{\numberline {3.1.5}程序模块划分}{11}{subsubsection.3.1.5}%
+\contentsline {subsection}{\numberline {3.2}主要流程图及说明}{11}{subsection.3.2}%
+\contentsline {subsubsection}{\numberline {3.2.1}Q1 程序流程图}{11}{subsubsection.3.2.1}%
+\contentsline {subsubsection}{\numberline {3.2.2}关键函数说明}{11}{subsubsection.3.2.2}%
+\contentsline {subsubsection}{\numberline {3.2.3}数据结构说明}{15}{subsubsection.3.2.3}%
+\contentsline {subsubsection}{\numberline {3.2.4}程序执行流程说明}{15}{subsubsection.3.2.4}%
+\contentsline {subsection}{\numberline {3.3}结果分析}{16}{subsection.3.3}%
+\contentsline {subsubsection}{\numberline {3.3.1}Q1 运行结果}{16}{subsubsection.3.3.1}%
+\contentsline {subsubsection}{\numberline {3.3.2}频谱图分析}{17}{subsubsection.3.3.2}%
+\contentsline {subsubsection}{\numberline {3.3.3}结果验证与讨论}{20}{subsubsection.3.3.3}%
+\contentsline {subsubsection}{\numberline {3.3.4}Q2 程序流程图}{21}{subsubsection.3.3.4}%
+\contentsline {subsubsection}{\numberline {3.3.5}Q2 运行结果}{21}{subsubsection.3.3.5}%
+\contentsline {subsubsection}{\numberline {3.3.6}频率响应分析}{22}{subsubsection.3.3.6}%
+\contentsline {subsubsection}{\numberline {3.3.7}滤波器设计验证}{27}{subsubsection.3.3.7}%
+\contentsline {subsubsection}{\numberline {3.3.8}设计方法讨论}{28}{subsubsection.3.3.8}%
+\contentsline {subsubsection}{\numberline {3.3.9}Q3 程序流程图}{29}{subsubsection.3.3.9}%
+\contentsline {subsubsection}{\numberline {3.3.10}Q3 运行结果}{29}{subsubsection.3.3.10}%
+\contentsline {subsubsection}{\numberline {3.3.11}频谱分析}{30}{subsubsection.3.3.11}%
+\contentsline {subsubsection}{\numberline {3.3.12}频谱演变分析}{32}{subsubsection.3.3.12}%
+\contentsline {subsubsection}{\numberline {3.3.13}系统特性分析}{33}{subsubsection.3.3.13}%
+\contentsline {subsubsection}{\numberline {3.3.14}解调原理验证}{34}{subsubsection.3.3.14}%
+\contentsline {subsubsection}{\numberline {3.3.15}滤波顺序讨论}{35}{subsubsection.3.3.15}%
+\contentsline {subsubsection}{\numberline {3.3.16}与理论的对比}{36}{subsubsection.3.3.16}%
+\contentsline {subsubsection}{\numberline {3.3.17}Q4 程序流程图}{38}{subsubsection.3.3.17}%
+\contentsline {subsubsection}{\numberline {3.3.18}Q4 运行结果}{38}{subsubsection.3.3.18}%
+\contentsline {subsubsection}{\numberline {3.3.19}频谱分析}{38}{subsubsection.3.3.19}%
+\contentsline {subsubsection}{\numberline {3.3.20}理想滤波器的数学实现}{41}{subsubsection.3.3.20}%
+\contentsline {subsubsection}{\numberline {3.3.21}Q3 与 Q4 对比分析}{42}{subsubsection.3.3.21}%
+\contentsline {subsubsection}{\numberline {3.3.22}理想滤波器的 Gibbs 现象}{43}{subsubsection.3.3.22}%
+\contentsline {subsubsection}{\numberline {3.3.23}方法优缺点对比}{44}{subsubsection.3.3.23}%
+\contentsline {subsubsection}{\numberline {3.3.24}应用场景选择}{45}{subsubsection.3.3.24}%
+\contentsline {subsubsection}{\numberline {3.3.25}结果验证与讨论}{46}{subsubsection.3.3.25}%
+\contentsline {subsubsection}{\numberline {3.3.26}理论与实践的对比}{47}{subsubsection.3.3.26}%
+\contentsline {section}{\numberline {4}总结与体会}{47}{section.4}%
+\contentsline {subsection}{\numberline {4.1}技术收获}{48}{subsection.4.1}%
+\contentsline {subsubsection}{\numberline {4.1.1}1. 信号处理理论的深入理解}{48}{subsubsection.4.1.1}%
+\contentsline {subsubsection}{\numberline {4.1.2}2. 编程能力的提升}{48}{subsubsection.4.1.2}%
+\contentsline {subsubsection}{\numberline {4.1.3}3. 理论与实践的结合}{49}{subsubsection.4.1.3}%
+\contentsline {subsection}{\numberline {4.2}方法论收获}{49}{subsection.4.2}%
+\contentsline {subsubsection}{\numberline {4.2.1}1. 问题分解与模块化}{49}{subsubsection.4.2.1}%
+\contentsline {subsubsection}{\numberline {4.2.2}2. 对比与验证}{49}{subsubsection.4.2.2}%
+\contentsline {subsubsection}{\numberline {4.2.3}3. 文档与可视化}{50}{subsubsection.4.2.3}%
+\contentsline {subsection}{\numberline {4.3}对 AM 解调的深入认识}{50}{subsection.4.3}%
+\contentsline {subsubsection}{\numberline {4.3.1}1. 解调的本质}{50}{subsubsection.4.3.1}%
+\contentsline {subsubsection}{\numberline {4.3.2}2. 频率偏差的影响}{50}{subsubsection.4.3.2}%
+\contentsline {subsubsection}{\numberline {4.3.3}3. 时域与频域的选择}{50}{subsubsection.4.3.3}%
+\contentsline {subsection}{\numberline {4.4}遇到的挑战与解决}{51}{subsection.4.4}%
+\contentsline {subsubsection}{\numberline {4.4.1}1. Rust 语言的学习曲线}{51}{subsubsection.4.4.1}%
+\contentsline {subsubsection}{\numberline {4.4.2}2. FFT 的归一化问题}{51}{subsubsection.4.4.2}%
+\contentsline {subsubsection}{\numberline {4.4.3}3. 频率搬移的方向问题}{51}{subsubsection.4.4.3}%
+\contentsline {subsubsection}{\numberline {4.4.4}4. Q3 与 Q4 相关性低的困惑}{51}{subsubsection.4.4.4}%
+\contentsline {subsection}{\numberline {4.5}不足与改进方向}{51}{subsection.4.5}%
+\contentsline {subsubsection}{\numberline {4.5.1}1. 滤波器阶数的优化}{51}{subsubsection.4.5.1}%
+\contentsline {subsubsection}{\numberline {4.5.2}2. 实时处理性能}{52}{subsubsection.4.5.2}%
+\contentsline {subsubsection}{\numberline {4.5.3}3. 窗函数的应用}{52}{subsubsection.4.5.3}%
+\contentsline {subsubsection}{\numberline {4.5.4}4. 更多解调方法的对比}{52}{subsubsection.4.5.4}%
+\contentsline {subsubsection}{\numberline {4.5.5}5. 抗噪声性能分析}{52}{subsubsection.4.5.5}%
+\contentsline {subsection}{\numberline {4.6}对未来学习和工作的启示}{52}{subsection.4.6}%
+\contentsline {subsection}{\numberline {4.7}致谢}{53}{subsection.4.7}%
+\contentsline {section}{参考文献}{54}{subsection.4.7}%
+\contentsline {section}{\numberline {A}程序主要代码}{55}{appendix.A}%
+\contentsline {section}{附录 程序主要代码}{55}{appendix.A}%
+\contentsline {subsection}{\numberline {A.1}项目结构}{55}{subsection.A.1}%
+\contentsline {subsection}{\numberline {A.2}主要依赖库}{56}{subsection.A.2}%
+\contentsline {subsection}{\numberline {A.3}编译与运行}{56}{subsection.A.3}%
+\contentsline {subsection}{\numberline {A.4}核心算法实现要点}{57}{subsection.A.4}%
+\contentsline {subsubsection}{\numberline {A.4.1}Q1 - FFT频谱分析}{57}{subsubsection.A.4.1}%
+\contentsline {subsubsection}{\numberline {A.4.2}Q2 - Butterworth滤波器设计}{57}{subsubsection.A.4.2}%
+\contentsline {subsubsection}{\numberline {A.4.3}Q3 - 时域解调}{57}{subsubsection.A.4.3}%
+\contentsline {subsubsection}{\numberline {A.4.4}Q4 - 频域解调}{58}{subsubsection.A.4.4}%
+\contentsline {subsection}{\numberline {A.5}输出文件说明}{58}{subsection.A.5}%
+\contentsline {subsubsection}{\numberline {A.5.1}Q1 输出 (5个文件)}{58}{subsubsection.A.5.1}%
+\contentsline {subsubsection}{\numberline {A.5.2}Q2 输出 (9个文件)}{58}{subsubsection.A.5.2}%
+\contentsline {subsubsection}{\numberline {A.5.3}Q3 输出 (7个文件)}{58}{subsubsection.A.5.3}%
+\contentsline {subsubsection}{\numberline {A.5.4}Q4 输出 (8个文件)}{59}{subsubsection.A.5.4}%
+\contentsline {subsection}{\numberline {A.6}代码特色}{59}{subsection.A.6}%

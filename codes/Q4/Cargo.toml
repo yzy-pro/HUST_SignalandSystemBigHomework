@@ -1,0 +1,10 @@
+[package]
+name = "q4_frequency_domain_demodulation"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hound = "3.5"
+rustfft = "6.1"
+plotters = "=0.3.1"
+num-complex = "0.4"

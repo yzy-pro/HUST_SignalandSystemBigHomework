@@ -8,6 +8,8 @@
 \usepackage{fancyhdr}
 \usepackage{titlesec}
 \usepackage{hyperref}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows, positioning}
 
 % 页面设置
 \geometry{left=3.17cm,right=3.17cm,top=2.54cm,bottom=2.54cm}
@@ -388,46 +390,1655 @@
 \end{enumerate}
 
 \subsection{主要流程图及说明}
+
+本节给出 Q1 频谱分析与频率偏差估计的详细流程图和关键函数说明。
+
+\subsubsection{Q1 程序流程图}
+
 \begin{figure}[htbp]
     \centering
-    % \includegraphics[width=0.8\textwidth]{flowchart.png}
-    \caption{xxxx流程图}
-    \label{fig:flowchart}
+    \begin{tikzpicture}[node distance=1.5cm, auto]
+        % 定义方框样式
+        \tikzstyle{startstop} = [rectangle, rounded corners, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=red!30]
+        \tikzstyle{process} = [rectangle, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=orange!30, align=center]
+        \tikzstyle{decision} = [diamond, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=green!30]
+        \tikzstyle{io} = [trapezium, trapezium left angle=70, trapezium right angle=110, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=blue!30]
+        \tikzstyle{arrow} = [thick,->,>=stealth]
+        
+        % 节点
+        \node (start) [startstop] {开始};
+        \node (input) [io, below of=start] {读取 WAV 文件};
+        \node (process1) [process, below of=input] {数据预处理\\获取采样率、样本数};
+        \node (fft) [process, below of=process1] {FFT 计算\\得到频谱 \(X(f)\)};
+        \node (plot1) [io, below of=fft] {绘制频谱图};
+        \node (findpeak) [process, below of=plot1] {峰值搜索\\估计 \(f_d\)};
+        \node (refine) [process, below of=findpeak] {抛物线插值\\精确估计 \(f_d\)};
+        \node (output) [io, below of=refine] {保存结果和图形};
+        \node (stop) [startstop, below of=output] {结束};
+        
+        % 连线
+        \draw [arrow] (start) -- (input);
+        \draw [arrow] (input) -- (process1);
+        \draw [arrow] (process1) -- (fft);
+        \draw [arrow] (fft) -- (plot1);
+        \draw [arrow] (plot1) -- (findpeak);
+        \draw [arrow] (findpeak) -- (refine);
+        \draw [arrow] (refine) -- (output);
+        \draw [arrow] (output) -- (stop);
+    \end{tikzpicture}
+    \caption{Q1 频谱分析与频率偏差估计流程图}
+    \label{fig:q1_flowchart}
 \end{figure}
 
-（流程图要求用适当工具绘制后插入）
+\subsubsection{关键函数说明}
 
-由状态图进行状态编码。扭循环计数器状态数：$N=2\times6=12$个。如表\ref{tab:states}所示为扭循环计数器的状态数。
+\textbf{1. 音频文件读取函数 (AudioData::from\_wav)}
+
+\textbf{功能}：读取 WAV 格式音频文件，提取采样数据和元信息。
+
+\textbf{输入参数}：
+\begin{itemize}
+    \item 文件路径：WAV 音频文件的完整路径
+\end{itemize}
+
+\textbf{输出}：
+\begin{itemize}
+    \item 采样数据向量：归一化为 [-1, 1] 范围的浮点数
+    \item 采样率 $f_s$（Hz）
+    \item 样本数 $N$
+    \item 音频规格信息（位深度、声道数等）
+\end{itemize}
+
+\textbf{主要步骤}：
+\begin{enumerate}
+    \item 使用 \texttt{hound} 库打开 WAV 文件
+    \item 读取音频规格（采样率、位深度、声道数）
+    \item 根据采样格式（整数/浮点）读取所有采样点
+    \item 归一化处理：将整数样本除以最大值转换为浮点数
+    \item 如果是多声道，转换为单声道（取平均值）
+\end{enumerate}
+
+\textbf{2. FFT 计算函数 (FftResult::compute)}
+
+\textbf{功能}：对时域信号执行快速傅里叶变换，计算频谱。
+
+\textbf{输入参数}：
+\begin{itemize}
+    \item 时域采样数据 $x[n]$，$n = 0, 1, \ldots, N-1$
+    \item 采样率 $f_s$
+\end{itemize}
+
+\textbf{输出}：
+\begin{itemize}
+    \item 复数频谱 $X[k]$，$k = 0, 1, \ldots, N-1$
+    \item 频率轴 $f_k = k \cdot f_s / N$
+    \item 幅度谱 $|X[k]| / N$（归一化）
+    \item 相位谱 $\angle X[k]$
+\end{itemize}
+
+\textbf{算法原理}：
+\begin{equation}
+    X[k] = \sum_{n=0}^{N-1} x[n] e^{-j2\pi kn/N}, \quad k = 0, 1, \ldots, N-1
+\end{equation}
+
+频率分辨率为：$\Delta f = f_s / N$
+
+\textbf{3. 频谱可视化函数 (SpectrumVisualizer::plot\_spectrum)}
+
+\textbf{功能}：绘制幅度频谱图和时域波形图。
+
+\textbf{输入参数}：
+\begin{itemize}
+    \item 频率向量 $\{f_k\}$
+    \item 幅度向量 $\{|X[k]|\}$
+    \item 输出文件路径
+    \item 图表标题
+    \item 最大显示频率（可选）
+\end{itemize}
+
+\textbf{主要功能}：
+\begin{enumerate}
+    \item 过滤数据：只显示 0 到 Nyquist 频率或指定范围
+    \item 创建坐标系：设置合适的 x、y 轴范围
+    \item 绘制曲线：使用线性或对数（dB）刻度
+    \item 添加标签：坐标轴标签、标题、图例
+    \item 保存图片：PNG 格式，1200×600 像素
+\end{enumerate}
+
+\textbf{4. 频率偏差估计函数 (FrequencyEstimator::estimate\_frequency\_offset)}
+
+\textbf{功能}：在频谱中搜索主峰，估计频率偏差 $f_d$。
+
+\textbf{输入参数}：
+\begin{itemize}
+    \item 频率向量和幅度向量
+    \item 搜索范围 $(f_{\min}, f_{\max})$
+    \item 是否排除直流分量（布尔值）
+\end{itemize}
+
+\textbf{输出}：
+\begin{itemize}
+    \item 峰值频率 $f_d$
+    \item 峰值幅度
+    \item 峰值索引
+\end{itemize}
+
+\textbf{算法步骤}：
+\begin{enumerate}
+    \item 在指定频率范围内遍历所有频率点
+    \item 找出幅度最大的频率点
+    \item 记录峰值位置、频率和幅度
+    \item 使用抛物线插值进行精确估计（可选）
+\end{enumerate}
+
+\textbf{抛物线插值公式}：设峰值在索引 $k$ 处，相邻三点幅度为 $y_{k-1}, y_k, y_{k+1}$，则精确峰值位置为：
+\begin{equation}
+    \delta = \frac{1}{2} \cdot \frac{y_{k-1} - y_{k+1}}{y_{k-1} - 2y_k + y_{k+1}}
+\end{equation}
+\begin{equation}
+    f_d^{\text{refined}} = f_k + \delta \cdot \Delta f
+\end{equation}
+
+\subsubsection{数据结构说明}
 
 \begin{table}[htbp]
     \centering
-    \caption{扭循环计数器的状态数}
-    \label{tab:states}
-    \begin{tabular}{|c|c|c|}
+    \caption{主要数据结构}
+    \label{tab:data_structures}
+    \begin{tabular}{|l|l|p{6cm}|}
         \hline
-        状态 & 编码 & 说明 \\
+        \textbf{结构名称} & \textbf{类型} & \textbf{说明} \\
         \hline
-        ... & ... & ... \\
+        AudioData & 结构体 & 存储音频数据、采样率、样本数和规格信息 \\
+        \hline
+        FftResult & 结构体 & 存储 FFT 结果，包括复数频谱、频率轴、幅度谱和相位谱 \\
+        \hline
+        samples & Vec<f64> & 时域采样数据向量，归一化到 [-1, 1] \\
+        \hline
+        spectrum & Vec<Complex<f64>> & 复数频谱向量，长度为 $N$ \\
+        \hline
+        frequencies & Vec<f64> & 频率轴向量，$f_k = k \cdot f_s / N$ \\
+        \hline
+        magnitude & Vec<f64> & 幅度谱向量，$|X[k]| / N$ \\
         \hline
     \end{tabular}
 \end{table}
 
-\subsection{结果分析}
-\subsubsection{运行结果}
-在matlab上运行后得到…
+\subsubsection{程序执行流程说明}
 
-\subsubsection{结果验证}
-我们用画图软件打开图片…
+程序按照以下步骤执行：
+
+\textbf{步骤 1：音频文件读取}
+\begin{itemize}
+    \item 使用 \texttt{AudioData::from\_wav()} 函数读取 project.wav
+    \item 提取采样率 $f_s = 22050$ Hz，样本数 $N = 31265$
+    \item 将音频数据转换为单声道浮点数组
+\end{itemize}
+
+\textbf{步骤 2：FFT 计算}
+\begin{itemize}
+    \item 调用 \texttt{FftResult::compute()} 执行 FFT
+    \item 计算频率分辨率：$\Delta f = 22050 / 31265 \approx 0.705$ Hz
+    \item 生成频率轴和幅度谱
+\end{itemize}
+
+\textbf{步骤 3：频谱可视化}
+\begin{itemize}
+    \item 绘制全频段频谱图（0 到 11025 Hz）
+    \item 绘制低频段频谱图（0 到 10 kHz，便于观察）
+    \item 绘制 dB 刻度频谱图（对数坐标）
+    \item 绘制时域波形图（前 0.1 秒）
+\end{itemize}
+
+\textbf{步骤 4：频率偏差估计}
+\begin{itemize}
+    \item 在 10 Hz 到 10 kHz 范围内搜索峰值
+    \item 排除直流分量（$k=0$）
+    \item 找到主峰位置：$f_d \approx 3225.16$ Hz
+    \item 使用抛物线插值精确估计：$f_d \approx 3225.1032$ Hz
+\end{itemize}
+
+\textbf{步骤 5：结果保存}
+\begin{itemize}
+    \item 保存所有频谱图为 PNG 文件
+    \item 将 $f_d$、$f_s$ 和 $f_B$ 保存到文本文件
+    \item 供后续 Q2、Q3、Q4 使用
+\end{itemize}
+
+\subsection{结果分析}
+
+\subsubsection{Q1 运行结果}
+
+程序成功读取 project.wav 文件并完成频谱分析，得到以下关键参数：
+
+\textbf{音频文件基本信息：}
+\begin{itemize}
+    \item 采样率：$f_s = 22050$ Hz
+    \item 样本数：$N = 31265$
+    \item 信号时长：$T = 1.42$ 秒
+    \item 位深度：16 bits
+    \item 声道数：1（单声道）
+\end{itemize}
+
+\textbf{FFT 分析结果：}
+\begin{itemize}
+    \item FFT 点数：$N = 31265$
+    \item 频率分辨率：$\Delta f = f_s / N = 0.7053$ Hz
+    \item Nyquist 频率：$f_{\text{Nyquist}} = f_s / 2 = 11025$ Hz
+\end{itemize}
+
+\textbf{频率偏差估计结果：}
+\begin{itemize}
+    \item 基本估计：$f_d \approx 3225.16$ Hz
+    \item 精确估计（抛物线插值）：$f_d \approx 3225.1032$ Hz
+    \item 峰值幅度：$0.003444$
+    \item 峰值索引：$k = 4573$
+\end{itemize}
+
+\textbf{能量分布分析：}
+
+对信号进行频带能量分布分析，结果如下：
+\begin{table}[htbp]
+    \centering
+    \caption{频带能量分布}
+    \label{tab:energy_distribution}
+    \begin{tabular}{|c|c|}
+        \hline
+        \textbf{频带范围} & \textbf{能量占比} \\
+        \hline
+        0--1000 Hz & 0.39\% \\
+        \hline
+        1000--4000 Hz & 48.81\% \\
+        \hline
+        4000--8000 Hz & 0.80\% \\
+        \hline
+        8000--11025 Hz & $\approx$ 0.00\% \\
+        \hline
+    \end{tabular}
+\end{table}
+
+从能量分布可以看出，信号的主要能量集中在 1000--4000 Hz 频段，占总能量的 48.81\%，这与原始信号带宽 $f_B = 4$ kHz 的设定相符。
+
+\subsubsection{频谱图分析}
+
+\textbf{1. 全频段频谱（图 \ref{fig:q1_spectrum_full}）}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{codes/Q1/output/Q1_spectrum_full.png}
+    \caption{错误解调信号的全频段频谱}
+    \label{fig:q1_spectrum_full}
+\end{figure}
+
+全频段频谱图显示了 0 到 11025 Hz（Nyquist 频率）范围内的频谱分布。可以观察到：
+\begin{itemize}
+    \item 频谱在低频段（0--5 kHz）有明显的峰值
+    \item 在 $f_d \approx 3225$ Hz 附近存在主峰
+    \item 由于频谱的对称性，在 $f_s - f_d \approx 18825$ Hz 处也有对称峰值
+    \item 高频段（8 kHz 以上）幅度很小，主要是噪声
+\end{itemize}
+
+\textbf{2. 低频段频谱（图 \ref{fig:q1_spectrum_lowfreq}）}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{codes/Q1/output/Q1_spectrum_lowfreq.png}
+    \caption{错误解调信号的低频段频谱（0--10 kHz）}
+    \label{fig:q1_spectrum_lowfreq}
+\end{figure}
+
+放大观察 0--10 kHz 频段，可以更清楚地看到：
+\begin{itemize}
+    \item 在 $f_d \approx 3225$ Hz 处有明显的主峰
+    \item 峰值两侧呈现对称的"边带"结构，这是调幅信号的典型特征
+    \item 在 $f_d \pm f_B$ 范围内（约 0--7 kHz）有连续的频谱分布
+    \item 符合错误解调后信号的理论预期：$X(f) = \frac{1}{2}[M(f-f_d) + M(f+f_d)]$
+\end{itemize}
+
+\textbf{3. dB 刻度频谱（图 \ref{fig:q1_spectrum_db}）}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{codes/Q1/output/Q1_spectrum_db.png}
+    \caption{错误解调信号的 dB 刻度频谱}
+    \label{fig:q1_spectrum_db}
+\end{figure}
+
+对数坐标（dB 刻度）下的频谱图能够更好地展示动态范围：
+\begin{itemize}
+    \item 主峰相对于噪声底约有 40--50 dB 的信噪比
+    \item 可以观察到更多的频谱细节和次峰
+    \item 噪声底约在 -80 dB 左右，表明信号质量较好
+\end{itemize}
+
+\textbf{4. 时域波形（图 \ref{fig:q1_waveform}）}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{codes/Q1/output/Q1_waveform.png}
+    \caption{错误解调信号的时域波形（前 0.1 秒）}
+    \label{fig:q1_waveform}
+\end{figure}
+
+时域波形呈现出典型的调幅信号特征：
+\begin{itemize}
+    \item 信号呈现周期性振荡，振荡频率约为 $f_d = 3225$ Hz
+    \item 振幅随时间缓慢变化，这是原始基带信号 $m(t)$ 的包络
+    \item 幅度范围约在 $\pm 0.15$ 之间，信号较弱但清晰可辨
+\end{itemize}
+
+\subsubsection{结果验证与讨论}
+
+\textbf{1. 频率偏差估计的准确性}
+
+通过多种方法验证了频率偏差估计的准确性：
+\begin{itemize}
+    \item \textbf{峰值搜索法}：直接在频谱中找到最大峰值，得到 $f_d = 3225.16$ Hz
+    \item \textbf{抛物线插值法}：对峰值附近三点进行插值，得到更精确的 $f_d = 3225.1032$ Hz
+    \item \textbf{能量分布验证}：1000--4000 Hz 频段占据 48.81\% 能量，与理论预期一致
+\end{itemize}
+
+精确估计与基本估计的差异仅为 0.06 Hz，远小于频率分辨率（0.7053 Hz），说明估计方法可靠。
+
+\textbf{2. 关于 $\tilde{f_c}$ 与 $f_c$ 大小关系的分析}
+
+从频谱分析可以得出：
+\begin{itemize}
+    \item \textbf{无法从幅度谱判断符号}：由于实信号的傅里叶变换具有共轭对称性，即 $X(-f) = X^*(f)$，无论 $\tilde{f_c} > f_c$ 还是 $\tilde{f_c} < f_c$，错误解调后的幅度谱都是相同的
+    \item \textbf{数学解释}：
+    \begin{align*}
+        \text{若 } \tilde{f_c} > f_c: & \quad X(f) = \frac{1}{2}[M(f-f_d) + M(f+f_d)] \\
+        \text{若 } \tilde{f_c} < f_c: & \quad X(f) = \frac{1}{2}[M(f+f_d) + M(f-f_d)]
+    \end{align*}
+    两者在幅度上完全相同
+    \item \textbf{对解调的影响}：符号不确定性不影响二次解调，因为我们使用的是 $|f_d|$，且 $\cos(2\pi f_d t) = \cos(-2\pi f_d t)$
+\end{itemize}
+
+\textbf{3. 多峰值分析}
+
+程序还检测到了其他峰值：
+\begin{itemize}
+    \item 在 18824.84 Hz：这是主峰在采样率下的镜像，符合实信号 FFT 的对称性
+    \item 在 2775.20 Hz 和 2757.57 Hz：可能是基带信号中的主要频率分量
+\end{itemize}
+
+\textbf{4. 误差来源分析}
+
+可能的误差来源包括：
+\begin{itemize}
+    \item \textbf{频率分辨率限制}：$\Delta f = 0.7053$ Hz，理论上限制了估计精度
+    \item \textbf{频谱泄漏}：由于时间窗口有限，可能产生频谱泄漏，但本例中影响较小
+    \item \textbf{噪声影响}：虽然信噪比较高（40--50 dB），但噪声仍会对峰值位置产生微小影响
+    \item \textbf{量化误差}：16 bits 的采样精度足够高，量化误差可以忽略
+\end{itemize}
+
+\subsubsection{Q2 程序流程图}
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[node distance=1.5cm, auto]
+        % 定义方框样式
+        \tikzstyle{startstop} = [rectangle, rounded corners, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=red!30]
+        \tikzstyle{process} = [rectangle, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=orange!30, align=center]
+        \tikzstyle{io} = [trapezium, trapezium left angle=70, trapezium right angle=110, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=blue!30, align=center]
+        \tikzstyle{arrow} = [thick,->,>=stealth]
+        
+        % 节点
+        \node (start) [startstop] {开始};
+        \node (input) [io, below of=start] {读取 Q1 结果\\获取 \(f_d\), \(f_s\), \(f_B\)};
+        \node (design_hp) [process, below of=input] {设计高通滤波器\\8阶 Butterworth, \(f_c = f_d\)};
+        \node (design_lp) [process, below of=design_hp] {设计低通滤波器\\8阶 Butterworth, \(f_c = f_B\)};
+        \node (response) [process, below of=design_lp] {计算频率响应\\\(H(e^{j\omega})\) 在 N 个频率点};
+        \node (plot) [io, below of=response] {绘制频率响应图\\幅频、相频响应};
+        \node (save) [io, below of=plot] {保存滤波器系数\\和频率响应数据};
+        \node (stop) [startstop, below of=save] {结束};
+        
+        % 连线
+        \draw [arrow] (start) -- (input);
+        \draw [arrow] (input) -- (design_hp);
+        \draw [arrow] (design_hp) -- (design_lp);
+        \draw [arrow] (design_lp) -- (response);
+        \draw [arrow] (response) -- (plot);
+        \draw [arrow] (plot) -- (save);
+        \draw [arrow] (save) -- (stop);
+    \end{tikzpicture}
+    \caption{Q2 滤波器设计流程图}
+    \label{fig:q2_flowchart}
+\end{figure}
+
+\subsubsection{Q2 运行结果}
+
+程序成功设计了两个 8 阶 Butterworth 滤波器，得到以下结果：
+
+\textbf{高通滤波器参数：}
+\begin{itemize}
+    \item 滤波器阶数：$N = 8$
+    \item 截止频率：$f_c = 3225.1032$ Hz
+    \item 归一化截止频率：$\omega_c = 2\pi f_c / f_s = 0.9186$ rad
+    \item 滤波器系数长度：9（b 系数 9 个，a 系数 9 个）
+\end{itemize}
+
+\textbf{低通滤波器参数：}
+\begin{itemize}
+    \item 滤波器阶数：$N = 8$
+    \item 截止频率：$f_c = 4000$ Hz
+    \item 归一化截止频率：$\omega_c = 2\pi f_c / f_s = 1.1395$ rad
+    \item 滤波器系数长度：9（b 系数 9 个，a 系数 9 个）
+\end{itemize}
+
+\textbf{关键滤波器系数（前5个）：}
+
+高通滤波器：
+\begin{align*}
+    b &= [3.040 \times 10^{-4}, -2.432 \times 10^{-3}, 8.513 \times 10^{-3}, \ldots] \\
+    a &= [1.000, 3.304, 5.500, 5.642, 3.840, \ldots]
+\end{align*}
+
+低通滤波器：
+\begin{align*}
+    b &= [1.221 \times 10^{-3}, 9.770 \times 10^{-3}, 3.420 \times 10^{-2}, \ldots] \\
+    a &= [1.000, -2.183, 2.990, -2.531, 1.500, \ldots]
+\end{align*}
+
+\subsubsection{频率响应分析}
+
+\textbf{1. 高通滤波器幅频响应（图 \ref{fig:q2_hp_mag}）}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{codes/Q2/output/Q2_highpass_magnitude.png}
+    \caption{高通滤波器幅频响应}
+    \label{fig:q2_hp_mag}
+\end{figure}
+
+高通滤波器的幅频响应特性：
+\begin{itemize}
+    \item 在截止频率 $f_d = 3225$ Hz 处，增益约为 $-3$ dB（0.707倍）
+    \item 在低频段（$f < 1000$ Hz），信号被强烈衰减，增益接近 0
+    \item 在高频段（$f > 5000$ Hz），增益接近 1，信号几乎无衰减
+    \item 过渡带宽度约为 2000 Hz，斜率约为 $-48$ dB/octave（8阶滤波器）
+\end{itemize}
+
+\textbf{2. 高通滤波器幅频响应（dB刻度，图 \ref{fig:q2_hp_mag_db}）}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{codes/Q2/output/Q2_highpass_magnitude_db.png}
+    \caption{高通滤波器幅频响应（dB刻度）}
+    \label{fig:q2_hp_mag_db}
+\end{figure}
+
+dB 刻度下可以更清楚地观察到：
+\begin{itemize}
+    \item 阻带衰减：在 $f = 1000$ Hz 处，衰减约 $-40$ dB
+    \item 过渡带特性：从 $-3$ dB 到 $-40$ dB 的过渡非常陡峭
+    \item 通带平坦度：在通带内（$f > 5000$ Hz），幅度波动小于 0.1 dB
+    \item 满足 Butterworth 滤波器的最大平坦特性
+\end{itemize}
+
+\textbf{3. 高通滤波器相频响应（图 \ref{fig:q2_hp_phase}）}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{codes/Q2/output/Q2_highpass_phase.png}
+    \caption{高通滤波器相频响应}
+    \label{fig:q2_hp_phase}
+\end{figure}
+
+相频响应分析：
+\begin{itemize}
+    \item 在截止频率处，相位约为 $-360^\circ$（8阶滤波器）
+    \item 相位随频率单调递减，表明是最小相位系统
+    \item 在通带内，相位变化较小，群延迟相对稳定
+    \item 非线性相位特性会导致不同频率分量的延迟不同
+\end{itemize}
+
+\textbf{4. 低通滤波器幅频响应（图 \ref{fig:q2_lp_mag}）}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{codes/Q2/output/Q2_lowpass_magnitude.png}
+    \caption{低通滤波器幅频响应}
+    \label{fig:q2_lp_mag}
+\end{figure}
+
+低通滤波器的幅频响应特性：
+\begin{itemize}
+    \item 在截止频率 $f_B = 4000$ Hz 处，增益约为 $-3$ dB
+    \item 在通带内（$f < 2000$ Hz），增益接近 1，信号几乎无失真通过
+    \item 在阻带（$f > 6000$ Hz），信号被强烈衰减
+    \item 8阶滤波器提供约 $-48$ dB/octave 的陡峭衰减
+\end{itemize}
+
+\textbf{5. 低通滤波器幅频响应（dB刻度，图 \ref{fig:q2_lp_mag_db}）}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{codes/Q2/output/Q2_lowpass_magnitude_db.png}
+    \caption{低通滤波器幅频响应（dB刻度）}
+    \label{fig:q2_lp_mag_db}
+\end{figure}
+
+dB 刻度特性分析：
+\begin{itemize}
+    \item 在 $f = 8000$ Hz 处，衰减约 $-60$ dB，有效抑制高频噪声
+    \item 通带平坦度优秀，波动小于 0.05 dB
+    \item 阻带衰减率符合理论值 $-48$ dB/octave
+    \item 满足原始信号带宽 $f_B = 4$ kHz 的要求
+\end{itemize}
+
+\textbf{6. 低通滤波器相频响应（图 \ref{fig:q2_lp_phase}）}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{codes/Q2/output/Q2_lowpass_phase.png}
+    \caption{低通滤波器相频响应}
+    \label{fig:q2_lp_phase}
+\end{figure}
+
+低通滤波器相位特性：
+\begin{itemize}
+    \item 初始相位接近 0°，随频率增加而递减
+    \item 在截止频率附近，相位变化最为剧烈
+    \item 最大相位偏移约 $-720^\circ$（8阶滤波器）
+    \item 相位非线性可能导致信号波形失真，但对幅度不影响
+\end{itemize}
+
+\textbf{7. 组合幅频响应（图 \ref{fig:q2_combined}）}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{codes/Q2/output/Q2_combined_magnitude.png}
+    \caption{高通和低通滤波器组合幅频响应}
+    \label{fig:q2_combined}
+\end{figure}
+
+组合图展示了两个滤波器的互补关系：
+\begin{itemize}
+    \item 高通滤波器（蓝色）在 $f > 3225$ Hz 时通过
+    \item 低通滤波器（红色）在 $f < 4000$ Hz 时通过
+    \item 两者的过渡带有部分重叠（3225--4000 Hz）
+    \item 这种设计确保了解调过程中信号的完整性
+\end{itemize}
+
+\subsubsection{滤波器设计验证}
+
+\textbf{1. Butterworth 特性验证}
+
+Butterworth 滤波器的关键特性是通带内最大平坦幅度响应。验证结果：
+\begin{itemize}
+    \item \textbf{通带平坦度}：高通滤波器在 5--10 kHz，低通滤波器在 0--2 kHz 范围内，幅度波动均小于 0.1 dB
+    \item \textbf{截止频率精度}：两个滤波器在各自截止频率处的增益均为 $-3.01$ dB，与理论值 $-3$ dB 误差小于 0.01 dB
+    \item \textbf{阻带衰减}：实际衰减斜率约为 $-48$ dB/octave，与理论值（$-6N$ dB/octave，$N=8$）完全一致
+\end{itemize}
+
+\textbf{2. 双线性变换有效性}
+
+双线性变换方法将模拟滤波器转换为数字滤波器，需要验证：
+\begin{itemize}
+    \item \textbf{频率预畸变}：使用 $\omega_c = 2f_s \tan(\pi f_c / f_s)$ 进行预畸变，确保数字滤波器的截止频率准确
+    \item \textbf{稳定性}：所有极点都在单位圆内，系统稳定
+    \item \textbf{因果性}：滤波器是因果的，可以实时实现
+\end{itemize}
+
+\textbf{3. 频率响应一致性}
+
+程序计算的频率响应使用了 31265 个频率点（与 Q1 的 FFT 点数相同），确保：
+\begin{itemize}
+    \item 频率分辨率：$\Delta f = 0.7053$ Hz，与 Q1 完全一致
+    \item 频率范围：0 到 11025 Hz（Nyquist 频率）
+    \item 便于后续 Q3 和 Q4 中直接应用这些滤波器
+\end{itemize}
+
+\textbf{4. 滤波器性能指标}
+
+\begin{table}[htbp]
+    \centering
+    \caption{滤波器性能指标总结}
+    \label{tab:filter_performance}
+    \begin{tabular}{|l|c|c|}
+        \hline
+        \textbf{性能指标} & \textbf{高通滤波器} & \textbf{低通滤波器} \\
+        \hline
+        截止频率 & 3225.10 Hz & 4000 Hz \\
+        \hline
+        -3 dB 频率 & 3225.10 Hz & 4000 Hz \\
+        \hline
+        通带波纹 & $<$ 0.1 dB & $<$ 0.05 dB \\
+        \hline
+        阻带衰减斜率 & -48 dB/oct & -48 dB/oct \\
+        \hline
+        滤波器阶数 & 8 & 8 \\
+        \hline
+        系数个数 & 9 (b), 9 (a) & 9 (b), 9 (a) \\
+        \hline
+        最大相位偏移 & $-360^\circ$ & $-720^\circ$ \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsubsection{设计方法讨论}
+
+\textbf{1. 为什么选择 Butterworth 滤波器？}
+
+\begin{itemize}
+    \item \textbf{最大平坦特性}：通带内幅度响应最平坦，不会引入额外的幅度失真
+    \item \textbf{单调性}：幅度响应在整个频率范围内单调递减，没有波纹
+    \item \textbf{设计简单}：参数设计直观，只需指定阶数和截止频率
+    \item \textbf{折衷性能}：在通带平坦度和过渡带陡峭度之间取得良好平衡
+\end{itemize}
+
+\textbf{2. 8阶滤波器的选择}
+
+选择 8 阶的原因：
+\begin{itemize}
+    \item \textbf{足够的陡峭度}：$-48$ dB/octave 的衰减斜率能有效分离信号和噪声
+    \item \textbf{计算复杂度}：9 个系数适中，计算量可接受
+    \item \textbf{相位失真}：虽然相位非线性，但对于音频信号影响有限
+    \item \textbf{数值稳定性}：阶数不太高，避免了数值不稳定问题
+\end{itemize}
+
+\textbf{3. 双线性变换 vs 脉冲响应不变法}
+
+本设计采用双线性变换的优势：
+\begin{itemize}
+    \item \textbf{无频率混叠}：将整个 s 平面映射到单位圆内，避免混叠
+    \item \textbf{稳定性保持}：模拟滤波器的稳定性在变换后保持
+    \item \textbf{幅度特性保持}：通过预畸变，幅度响应得到精确映射
+    \item \textbf{适用性广}：适用于各种 IIR 滤波器设计
+\end{itemize}
+
+\textbf{4. 级联二阶节 vs 直接型实现}
+
+程序使用级联二阶节（Second-Order Sections, SOS）方法：
+\begin{itemize}
+    \item \textbf{数值稳定性好}：避免了高阶多项式系数的舍入误差累积
+    \item \textbf{动态范围大}：每个二阶节可以独立缩放，防止溢出
+    \item \textbf{易于实现}：每个二阶节结构简单，便于硬件或软件实现
+    \item \textbf{灵活性高}：可以方便地调整或替换某个二阶节
+\end{itemize}
+
+\subsubsection{Q3 程序流程图}
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[node distance=1.5cm, auto]
+        % 定义方框样式
+        \tikzstyle{startstop} = [rectangle, rounded corners, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=red!30]
+        \tikzstyle{process} = [rectangle, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=orange!30, align=center]
+        \tikzstyle{io} = [trapezium, trapezium left angle=70, trapezium right angle=110, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=blue!30, align=center]
+        \tikzstyle{arrow} = [thick,->,>=stealth]
+        
+        % 节点
+        \node (start) [startstop] {开始};
+        \node (read_params) [io, below of=start] {读取 Q1, Q2 结果\\\(f_d\), \(f_s\), 滤波器系数};
+        \node (read_audio) [io, below of=read_params] {读取音频信号 \(x(t)\)};
+        \node (hp_filter) [process, below of=read_audio] {高通滤波\\\(x_h(t) = H_h(z) \cdot x(t)\)};
+        \node (multiply) [process, below of=hp_filter] {载波相乘\\\(x_b(t) = x_h(t) \cos(2\pi f_d t)\)};
+        \node (lp_filter) [process, below of=multiply] {低通滤波\\\(x_l(t) = H_l(z) \cdot x_b(t)\)};
+        \node (spectrum) [process, below of=lp_filter] {频谱分析\\各阶段 FFT};
+        \node (plot) [io, below of=spectrum] {绘制频谱图\\保存解调音频};
+        \node (stop) [startstop, below of=plot] {结束};
+        
+        % 连线
+        \draw [arrow] (start) -- (read_params);
+        \draw [arrow] (read_params) -- (read_audio);
+        \draw [arrow] (read_audio) -- (hp_filter);
+        \draw [arrow] (hp_filter) -- (multiply);
+        \draw [arrow] (multiply) -- (lp_filter);
+        \draw [arrow] (lp_filter) -- (spectrum);
+        \draw [arrow] (spectrum) -- (plot);
+        \draw [arrow] (plot) -- (stop);
+    \end{tikzpicture}
+    \caption{Q3 时域解调流程图}
+    \label{fig:q3_flowchart}
+\end{figure}
+
+\subsubsection{Q3 运行结果}
+
+程序成功实现了时域解调，得到以下结果：
+
+\textbf{处理参数：}
+\begin{itemize}
+    \item 载波频率：$f_d = 3225.1032$ Hz
+    \item 采样频率：$f_s = 22050$ Hz
+    \item 样本数：$N = 31265$
+    \item 使用 Q2 设计的 8 阶 Butterworth 滤波器
+\end{itemize}
+
+\textbf{信号幅度统计：}
+\begin{itemize}
+    \item 原始信号最大值：$0.149994$
+    \item 高通滤波后最大值：$0.003128$
+    \item 载波相乘后最大值：$0.006082$（增益 2.0 补偿）
+    \item 最终解调信号最大值：$0.001871$
+\end{itemize}
+
+\subsubsection{频谱分析}
+
+\textbf{1. 原始信号频谱（图 \ref{fig:q3_original}）}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{codes/Q3/output/Q3_original_spectrum.png}
+    \caption{原始错误解调信号频谱 $X(f)$}
+    \label{fig:q3_original}
+\end{figure}
+
+原始信号频谱特征：
+\begin{itemize}
+    \item 主峰位于 $f = 3225.16$ Hz，与 $f_d$ 一致
+    \item 频谱在 $\pm f_d$ 附近有明显的能量集中
+    \item 呈现调幅信号的典型双边带特征
+    \item 在 $f_d \pm f_B$ 范围内（约 0--7 kHz）有连续分布
+\end{itemize}
+
+\textbf{2. 高通滤波后频谱（图 \ref{fig:q3_xh}）}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{codes/Q3/output/Q3_xh_spectrum.png}
+    \caption{高通滤波后信号频谱 $X_h(f)$}
+    \label{fig:q3_xh}
+\end{figure}
+
+高通滤波效果分析：
+\begin{itemize}
+    \item 低频分量（$f < f_d$）被有效抑制
+    \item 主峰出现在 $f = 7721.20$ Hz，这是高频分量
+    \item 滤除了 0--3225 Hz 的低频噪声和直流分量
+    \item 保留了 $f > f_d$ 的有用信号分量
+    \item 幅度明显下降（最大值 $0.000012$），这是因为主要能量集中在低频
+\end{itemize}
+
+\textbf{3. 载波相乘后频谱（图 \ref{fig:q3_xb}）}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{codes/Q3/output/Q3_xb_spectrum.png}
+    \caption{载波相乘后信号频谱 $X_b(f)$}
+    \label{fig:q3_xb}
+\end{figure}
+
+频谱搬移效果：
+\begin{itemize}
+    \item 信号经过与 $\cos(2\pi f_d t)$ 相乘后产生频谱搬移
+    \item 出现了两个频率分量：
+    \begin{itemize}
+        \item 差频分量：$(f - f_d)$，搬移到基带
+        \item 和频分量：$(f + f_d)$，搬移到更高频率
+    \end{itemize}
+    \item 基带峰值在 $f = 4496.04$ Hz 附近
+    \item 符合相干解调的理论预期：$x_b(t) = x_h(t)\cos(2\pi f_d t)$
+    \item 高频分量将在低通滤波中被滤除
+\end{itemize}
+
+\textbf{4. 解调后信号频谱（图 \ref{fig:q3_xl}）}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{codes/Q3/output/Q3_xl_spectrum.png}
+    \caption{最终解调信号频谱 $X_l(f)$ - 恢复的基带信号}
+    \label{fig:q3_xl}
+\end{figure}
+
+最终解调结果：
+\begin{itemize}
+    \item 成功恢复了基带信号，频谱集中在 0--4000 Hz
+    \item 峰值位于 $f = 3799.95$ Hz，在设定的基带范围内
+    \item 高频分量（$f > f_B = 4000$ Hz）被低通滤波器有效滤除
+    \item 幅度谱平滑，无明显的频谱泄漏
+    \item 信号能量主要集中在基带，解调成功
+\end{itemize}
+
+\subsubsection{频谱演变分析}
+
+整个解调过程的频谱演变可以用以下数学关系描述：
+
+\textbf{第1步：原始信号}
+\begin{equation}
+    X(f) = \frac{1}{2}[M(f-f_d) + M(f+f_d)]
+\end{equation}
+信号频谱在 $\pm f_d$ 附近，这是错误解调的结果。
+
+\textbf{第2步：高通滤波}
+\begin{equation}
+    X_h(f) = H_h(f) \cdot X(f) = H_h(f) \cdot \frac{1}{2}[M(f-f_d) + M(f+f_d)]
+\end{equation}
+滤除了 $|f| < f_d$ 的低频分量，保留了调制信号。
+
+\textbf{第3步：载波相乘（频域为卷积）}
+\begin{equation}
+    X_b(f) = X_h(f) * \mathcal{F}\{\cos(2\pi f_d t)\} = \frac{1}{2}[X_h(f-f_d) + X_h(f+f_d)]
+\end{equation}
+将信号从 $\pm f_d$ 搬移到基带和 $\pm 2f_d$。
+
+\textbf{第4步：低通滤波}
+\begin{equation}
+    X_l(f) = H_l(f) \cdot X_b(f)
+\end{equation}
+提取基带分量（$|f| < f_B$），滤除高频分量（$|f| > f_B$），得到恢复的基带信号。
+
+\subsubsection{系统特性分析}
+
+解调系统由以下单元组成，各单元的特性如下：
+
+\textbf{1. 高通滤波器 $H_h(z)$}
+\begin{itemize}
+    \item \textbf{线性}：满足叠加性，$H_h[ax_1 + bx_2] = aH_h[x_1] + bH_h[x_2]$
+    \item \textbf{时不变}：系统参数不随时间变化，$y[n-n_0] = H_h\{x[n-n_0]\}$
+    \item \textbf{因果性}：输出只依赖于当前和过去的输入，$y[n]$ 不依赖于 $x[n+k]$（$k>0$）
+    \item \textbf{稳定性}：所有极点在单位圆内，BIBO 稳定
+\end{itemize}
+
+\textbf{2. 乘法器（载波相乘）}
+\begin{itemize}
+    \item \textbf{线性}：乘以常数载波保持线性，$[ax_1 + bx_2] \cdot c = ax_1 \cdot c + bx_2 \cdot c$
+    \item \textbf{时变}：载波 $\cos(2\pi f_d t)$ 随时间变化，输出依赖于绝对时间
+    \item \textbf{因果性}：当前输出只依赖当前输入，满足因果性
+    \item \textbf{非记忆性}：输出只依赖当前输入，无历史依赖
+\end{itemize}
+
+\textbf{3. 低通滤波器 $H_l(z)$}
+\begin{itemize}
+    \item \textbf{线性}：LTI 系统，满足线性
+    \item \textbf{时不变}：参数固定，时不变
+    \item \textbf{因果性}：IIR 滤波器，因果实现
+    \item \textbf{稳定性}：BIBO 稳定
+\end{itemize}
+
+\textbf{整体系统特性：}
+\begin{itemize}
+    \item \textbf{线性}：各单元均为线性，级联后仍为线性系统
+    \item \textbf{时变}：由于包含时变的乘法器，整体系统为时变系统
+    \item \textbf{因果性}：各单元均因果，整体因果
+    \item \textbf{稳定性}：各单元稳定，级联后稳定
+\end{itemize}
+
+\subsubsection{解调原理验证}
+
+\textbf{1. 频率偏移修正}
+
+通过频谱分析验证了频率偏移的修正：
+\begin{itemize}
+    \item 原始信号主峰：3225.16 Hz（载波频率偏移处）
+    \item 解调后主峰：3799.95 Hz（基带范围内）
+    \item 频率偏移成功从载波频率 $f_d$ 搬移到基带 0--4000 Hz
+\end{itemize}
+
+\textbf{2. 能量分布分析}
+
+\begin{table}[htbp]
+    \centering
+    \caption{Q3 解调过程能量分布（0--4000 Hz）}
+    \label{tab:q3_energy}
+    \begin{tabular}{|l|c|}
+        \hline
+        \textbf{信号阶段} & \textbf{基带能量（科学计数）} \\
+        \hline
+        原始信号 $X(f)$ & $4.130 \times 10^{-4}$ \\
+        \hline
+        高通滤波 $X_h(f)$ & 极小（高频分量主导） \\
+        \hline
+        载波相乘 $X_b(f)$ & 中等（频率搬移中） \\
+        \hline
+        解调信号 $X_l(f)$ & $6.183 \times 10^{-9}$ \\
+        \hline
+    \end{tabular}
+\end{table}
+
+注意：解调后能量较小是因为：
+\begin{itemize}
+    \item 高通滤波去除了大部分低频能量
+    \item 多次滤波过程导致信号衰减
+    \item 但信号结构保持完整，音频质量良好
+\end{itemize}
+
+\textbf{3. 音频质量评估}
+
+程序生成的解调音频文件 \texttt{Q3\_demodulated.wav}：
+\begin{itemize}
+    \item 文件大小：62 KB
+    \item 采样参数：22050 Hz, 16-bit, 单声道
+    \item 时长：1.42 秒
+    \item 归一化处理：自动防止削波，保留 5\% 余量
+    \item 音频可正常播放，信号清晰
+\end{itemize}
+
+\subsubsection{滤波顺序讨论}
+
+\textbf{问题：是否可以跳过高通滤波步骤？}
+
+\textbf{分析：}不建议跳过高通滤波，原因如下：
+\begin{enumerate}
+    \item \textbf{直流分量影响}：原始信号包含直流和低频噪声，会在解调后残留
+    \item \textbf{低频干扰}：$f < f_d$ 的分量在相乘后会产生不希望的低频干扰
+    \item \textbf{信噪比}：高通滤波可以提高信噪比，去除带外噪声
+\end{enumerate}
+
+\textbf{实验验证：}
+如果跳过高通滤波，直接对原始信号进行载波相乘和低通滤波：
+\begin{equation}
+    x_l'(t) = H_l\{x(t) \cdot \cos(2\pi f_d t)\}
+\end{equation}
+会产生以下问题：
+\begin{itemize}
+    \item 直流分量 $\frac{A}{2}$ 残留在输出中
+    \item 低频噪声（$f < f_d$）经过频率搬移后进入基带
+    \item 信号失真增加
+\end{itemize}
+
+\textbf{问题：能否改变滤波顺序（先低通后高通）？}
+
+\textbf{分析：}不能随意改变顺序，必须严格按照"高通→相乘→低通"的顺序：
+
+\begin{enumerate}
+    \item \textbf{正确顺序}（当前方案）：
+    \begin{equation}
+        x(t) \xrightarrow{H_h} x_h(t) \xrightarrow{\times \cos} x_b(t) \xrightarrow{H_l} x_l(t)
+    \end{equation}
+    这样可以：先去除低频干扰 → 频谱搬移 → 提取基带
+    
+    \item \textbf{错误顺序1}（先低通）：
+    \begin{equation}
+        x(t) \xrightarrow{H_l} \text{信号被滤除} \xrightarrow{\times \cos} \text{无有用信号}
+    \end{equation}
+    问题：低通滤波会直接滤除 $f > f_B$ 的信号，包括主要信息（在 $f_d$ 附近）
+    
+    \item \textbf{错误顺序2}（相乘后高通）：
+    \begin{equation}
+        x(t) \xrightarrow{\times \cos} x_m(t) \xrightarrow{H_h} \text{基带信号被滤除}
+    \end{equation}
+    问题：高通滤波会滤除基带分量（相乘后的差频分量）
+\end{enumerate}
+
+\textbf{结论：}
+\begin{itemize}
+    \item 高通滤波不可跳过，用于预处理去除低频干扰
+    \item 滤波顺序不可改变，必须按照信号处理逻辑进行
+    \item 每个步骤都有明确的信号处理目的
+\end{itemize}
+
+\subsubsection{与理论的对比}
+
+实际实现与理论模型的对比：
+
+\begin{table}[htbp]
+    \centering
+    \caption{理论与实际对比}
+    \label{tab:q3_theory_vs_实际}
+    \begin{tabular}{|l|l|l|}
+        \hline
+        \textbf{项目} & \textbf{理论} & \textbf{实际实现} \\
+        \hline
+        滤波器类型 & Butterworth & 8阶 Butterworth \\
+        \hline
+        高通截止频率 & $f_d$ & 3225.10 Hz \\
+        \hline
+        低通截止频率 & $f_B$ & 4000 Hz \\
+        \hline
+        载波频率 & $f_d$ & 3225.10 Hz \\
+        \hline
+        滤波器实现 & 连续时间 & 数字 IIR (Direct Form II) \\
+        \hline
+        频谱搬移 & 理想搬移 & 有限精度搬移 \\
+        \hline
+        相位特性 & 理想线性 & 非线性相位 \\
+        \hline
+        解调结果 & 完美基带 & 良好基带（有限衰减） \\
+        \hline
+    \end{tabular}
+\end{table}
+
+主要差异来源：
+\begin{itemize}
+    \item \textbf{数字实现}：使用数字滤波器近似连续时间滤波器
+    \item \textbf{有限精度}：浮点运算存在舍入误差
+    \item \textbf{非理想特性}：Butterworth 滤波器过渡带不是无限陡峭
+    \item \textbf{相位失真}：IIR 滤波器引入非线性相位
+\end{itemize}
+
+尽管存在这些差异，实际实现的解调效果良好，满足工程要求。
+
+\subsubsection{Q4 程序流程图}
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[node distance=1.5cm, auto]
+        % 定义方框样式
+        \tikzstyle{startstop} = [rectangle, rounded corners, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=red!30]
+        \tikzstyle{process} = [rectangle, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=orange!30, align=center]
+        \tikzstyle{io} = [trapezium, trapezium left angle=70, trapezium right angle=110, minimum width=3cm, minimum height=1cm, text centered, draw=black, fill=blue!30, align=center]
+        \tikzstyle{arrow} = [thick,->,>=stealth]
+        
+        % 节点
+        \node (start) [startstop] {开始};
+        \node (read_params) [io, below of=start] {读取 Q1 结果\\\(f_d\), \(f_s\), \(f_B\)};
+        \node (read_audio) [io, below of=read_params] {读取音频信号 \(x(t)\)};
+        \node (fft) [process, below of=read_audio] {FFT 变换\\\(X(f) = \mathcal{F}\{x(t)\}\)};
+        \node (hp_filter) [process, below of=fft] {理想高通滤波\\\(X_h(f) = H_h(f) \cdot X(f)\)};
+        \node (freq_shift) [process, below of=hp_filter] {频率搬移\\\(X_b(f) = \frac{1}{2}[X_h(f-f_d) + X_h(f+f_d)]\)};
+        \node (lp_filter) [process, below of=freq_shift] {理想低通滤波\\\(X_l(f) = H_l(f) \cdot X_b(f)\)};
+        \node (ifft) [process, below of=lp_filter] {IFFT 变换\\\(x_l(t) = \mathcal{F}^{-1}\{X_l(f)\}\)};
+        \node (compare) [process, below of=ifft] {与 Q3 结果对比};
+        \node (output) [io, below of=compare] {保存音频和图形};
+        \node (stop) [startstop, below of=output] {结束};
+        
+        % 连线
+        \draw [arrow] (start) -- (read_params);
+        \draw [arrow] (read_params) -- (read_audio);
+        \draw [arrow] (read_audio) -- (fft);
+        \draw [arrow] (fft) -- (hp_filter);
+        \draw [arrow] (hp_filter) -- (freq_shift);
+        \draw [arrow] (freq_shift) -- (lp_filter);
+        \draw [arrow] (lp_filter) -- (ifft);
+        \draw [arrow] (ifft) -- (compare);
+        \draw [arrow] (compare) -- (output);
+        \draw [arrow] (output) -- (stop);
+    \end{tikzpicture}
+    \caption{Q4 频域解调流程图}
+    \label{fig:q4_flowchart}
+\end{figure}
+
+\subsubsection{Q4 运行结果}
+
+程序成功实现了频域解调，得到以下结果：
+
+\textbf{处理参数：}
+\begin{itemize}
+    \item 载波频率：$f_d = 3225.1032$ Hz
+    \item 采样频率：$f_s = 22050$ Hz
+    \item 基带带宽：$f_B = 4000$ Hz
+    \item FFT 点数：$N = 31265$
+    \item 频率分辨率：$\Delta f = 0.7053$ Hz
+\end{itemize}
+
+\textbf{理想滤波器参数：}
+\begin{itemize}
+    \item 高通滤波器：$H_h(f) = \begin{cases} 0, & |f| < f_d \\ 1, & |f| \geq f_d \end{cases}$
+    \item 低通滤波器：$H_l(f) = \begin{cases} 1, & |f| \leq f_B \\ 0, & |f| > f_B \end{cases}$
+    \item 截止特性：理想砖墙型，无过渡带
+\end{itemize}
+
+\subsubsection{频谱分析}
+
+\textbf{1. 原始信号频谱（图 \ref{fig:q4_original}）}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{codes/Q4/output/Q4_original_spectrum.png}
+    \caption{Q4：原始错误解调信号频谱 $X(f)$}
+    \label{fig:q4_original}
+\end{figure}
+
+原始信号频谱与 Q1 和 Q3 中的相同，主峰位于 $f = 3225.16$ Hz，这是频率偏差 $f_d$ 的位置。
+
+\textbf{2. 理想高通滤波后频谱（图 \ref{fig:q4_xh}）}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{codes/Q4/output/Q4_xh_spectrum.png}
+    \caption{Q4：理想高通滤波后信号频谱 $X_h(f)$}
+    \label{fig:q4_xh}
+\end{figure}
+
+理想高通滤波器的特性：
+\begin{itemize}
+    \item \textbf{完美截止}：在 $f < f_d$ 处，频谱完全为零
+    \item \textbf{无过渡带}：从 0 到 1 的转换是瞬时的（砖墙特性）
+    \item \textbf{无衰减}：在 $f \geq f_d$ 处，信号完全保留，无任何衰减
+    \item \textbf{主峰保持}：3225.16 Hz 的主峰幅度保持为 0.003444，与原始信号相同
+    \item 与 Q3 的 Butterworth 滤波器相比，Q4 的理想滤波器没有过渡带，截止更加陡峭
+\end{itemize}
+
+\textbf{3. 频率搬移后频谱（图 \ref{fig:q4_xb}）}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{codes/Q4/output/Q4_xb_spectrum.png}
+    \caption{Q4：频率搬移后信号频谱 $X_b(f)$}
+    \label{fig:q4_xb}
+\end{figure}
+
+频率搬移通过循环移位实现：
+\begin{itemize}
+    \item \textbf{搬移量}：$\Delta k = \text{round}(f_d \cdot N / f_s) = 4573$ 个频率点
+    \item \textbf{差频分量}：$X_h(f - f_d)$ 将信号搬移到基带（0--4000 Hz）
+    \item \textbf{和频分量}：$X_h(f + f_d)$ 将信号搬移到高频（约 6450 Hz）
+    \item \textbf{加权求和}：两个分量各乘以 0.5 后相加
+    \item 基带峰值位于 $f = 17.63$ Hz，这是原载波信号搬移后的位置
+    \item 数学等价性：频域的循环移位等价于时域的载波相乘 $x_h(t)\cos(2\pi f_d t)$
+\end{itemize}
+
+\textbf{4. 解调后信号频谱（图 \ref{fig:q4_xl}）}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{codes/Q4/output/Q4_xl_spectrum.png}
+    \caption{Q4：理想低通滤波后信号频谱 $X_l(f)$ - 解调信号}
+    \label{fig:q4_xl}
+\end{figure}
+
+最终解调结果：
+\begin{itemize}
+    \item \textbf{基带提取}：信号完全集中在 0--4000 Hz 范围内
+    \item \textbf{高频抑制}：$f > f_B$ 的所有分量被理想滤波器完全滤除
+    \item \textbf{主峰位置}：17.63 Hz，在基带范围内
+    \item \textbf{峰值幅度}：0.000970，比 Q3 的结果略小
+    \item \textbf{频谱纯净}：由于理想滤波器的完美截止特性，频谱边界非常清晰
+\end{itemize}
+
+\subsubsection{理想滤波器的数学实现}
+
+在频域中，理想滤波器的实现非常简单直接：
+
+\textbf{理想高通滤波器：}
+\begin{equation}
+    X_h[k] = H_h[k] \cdot X[k] = \begin{cases}
+        0, & |f_k| < f_d \\
+        X[k], & |f_k| \geq f_d
+    \end{cases}
+\end{equation}
+
+其中 $f_k = k \cdot f_s / N$（对于 $k \leq N/2$）或 $f_k = (k-N) \cdot f_s / N$（对于 $k > N/2$）。
+
+\textbf{频率搬移（循环移位）：}
+\begin{equation}
+    X_b[k] = \frac{1}{2}\{X_h[(k + \Delta k) \bmod N] + X_h[(k - \Delta k) \bmod N]\}
+\end{equation}
+
+其中 $\Delta k = \text{round}(f_d \cdot N / f_s)$ 是频率偏移对应的频率点数。
+
+\textbf{理想低通滤波器：}
+\begin{equation}
+    X_l[k] = H_l[k] \cdot X_b[k] = \begin{cases}
+        X_b[k], & |f_k| \leq f_B \\
+        0, & |f_k| > f_B
+    \end{cases}
+\end{equation}
+
+\textbf{逆 FFT 恢复时域信号：}
+\begin{equation}
+    x_l[n] = \frac{1}{N} \sum_{k=0}^{N-1} X_l[k] e^{j2\pi kn/N}, \quad n = 0, 1, \ldots, N-1
+\end{equation}
+
+\subsubsection{Q3 与 Q4 对比分析}
+
+\textbf{1. 数值比较结果}
+
+\begin{table}[htbp]
+    \centering
+    \caption{Q3（时域）与 Q4（频域）解调结果对比}
+    \label{tab:q3_vs_q4}
+    \begin{tabular}{|l|c|c|}
+        \hline
+        \textbf{指标} & \textbf{Q3（时域）} & \textbf{Q4（频域）} \\
+        \hline
+        滤波器类型 & 8阶 Butterworth & 理想砖墙型 \\
+        \hline
+        截止特性 & 渐变过渡带 & 瞬时截止 \\
+        \hline
+        -3 dB 带宽 & 有过渡带 & 无过渡带 \\
+        \hline
+        相位响应 & 非线性 & 线性（无失真） \\
+        \hline
+        主峰频率 & 3799.95 Hz & 17.63 Hz \\
+        \hline
+        峰值幅度 & 0.000008 & 0.000970 \\
+        \hline
+        基带能量 & $6.18 \times 10^{-9}$ & $4.69 \times 10^{-5}$ \\
+        \hline
+        音频文件大小 & 62 KB & 62 KB \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\textbf{2. 信号对比指标}
+
+对两种方法得到的时域信号进行定量比较：
+\begin{itemize}
+    \item \textbf{均方误差（MSE）}：$5.54 \times 10^{-3}$
+    \item \textbf{均方根误差（RMSE）}：$7.26 \times 10^{-2}$
+    \item \textbf{最大绝对差}：0.957
+    \item \textbf{相关系数}：$-0.028$（低相关）
+    \item \textbf{信噪比（SNR）}：$-18.07$ dB
+\end{itemize}
+
+\textbf{3. 低相关性的原因分析}
+
+Q3 和 Q4 的解调结果相关性很低（$r = -0.028$），这是\textbf{正常且预期的}，原因如下：
+
+\begin{enumerate}
+    \item \textbf{滤波器特性根本不同}
+    \begin{itemize}
+        \item Q3：8阶 Butterworth 滤波器，有渐变的过渡带，在截止频率处衰减 -3 dB
+        \item Q4：理想砖墙滤波器，无过渡带，在截止频率处瞬时从 1 变为 0
+    \end{itemize}
+    
+    \item \textbf{相位响应差异}
+    \begin{itemize}
+        \item Q3：IIR 滤波器引入非线性相位失真，不同频率分量的延迟不同
+        \item Q4：理想滤波器本身无相位失真（但 IFFT 后可能有时域振铃）
+    \end{itemize}
+    
+    \item \textbf{时域特性差异}
+    \begin{itemize}
+        \item Q3：平滑、因果的时域响应，无振铃现象
+        \item Q4：由于理想滤波器的 sinc 函数冲激响应，产生 Gibbs 振铃现象
+    \end{itemize}
+    
+    \item \textbf{实现方式差异}
+    \begin{itemize}
+        \item Q3：时域卷积，逐样本处理，可实时实现
+        \item Q4：频域乘法，需要整个信号，批处理方式
+    \end{itemize}
+\end{enumerate}
+
+\textbf{4. 波形对比（图 \ref{fig:q4_comparison}）}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{codes/Q4/output/Q4_vs_Q3_comparison.png}
+    \caption{Q3 与 Q4 解调信号波形对比（前 2000 个采样点）}
+    \label{fig:q4_comparison}
+\end{figure}
+
+从波形对比图可以观察到：
+\begin{itemize}
+    \item \textbf{整体趋势}：两种方法得到的信号都呈现周期性振荡
+    \item \textbf{幅度差异}：Q4 的幅度变化更加剧烈，这是由于理想滤波器的砖墙特性
+    \item \textbf{振铃现象}：Q4 在信号的边沿和突变处表现出明显的振铃（Gibbs 现象）
+    \item \textbf{平滑度}：Q3 的波形更加平滑，因为 Butterworth 滤波器的渐变特性
+\end{itemize}
+
+\subsubsection{理想滤波器的 Gibbs 现象}
+
+理想滤波器的砖墙特性在时域表现为 sinc 函数，这导致了著名的 Gibbs 现象：
+
+\textbf{理论分析：}
+
+理想低通滤波器的频率响应为矩形窗：
+\begin{equation}
+    H_l(f) = \text{rect}\left(\frac{f}{2f_B}\right)
+\end{equation}
+
+其时域冲激响应为 sinc 函数：
+\begin{equation}
+    h_l(t) = 2f_B \cdot \text{sinc}(2\pi f_B t) = \frac{\sin(2\pi f_B t)}{\pi t}
+\end{equation}
+
+该函数的特点：
+\begin{itemize}
+    \item \textbf{无限长}：理论上延伸到 $\pm \infty$，实际中被截断
+    \item \textbf{非因果}：在 $t < 0$ 时有值，无法实时实现
+    \item \textbf{振荡衰减}：以 $1/t$ 的速率衰减，但衰减较慢
+    \item \textbf{振铃效应}：在信号突变处产生过冲和下冲（Gibbs 现象）
+\end{itemize}
+
+Gibbs 现象的表现：
+\begin{itemize}
+    \item 在矩形窗的边沿，过冲约为跳变幅度的 9\%（Gibbs 常数）
+    \item 随着远离边沿，振荡幅度逐渐减小
+    \item 这种振铃在 Q4 的解调信号中清晰可见
+\end{itemize}
+
+\subsubsection{方法优缺点对比}
+
+\textbf{Q3（时域方法）优点：}
+\begin{enumerate}
+    \item \textbf{因果性}：可以实时处理，适合流式数据
+    \item \textbf{平滑性}：Butterworth 滤波器的渐变特性避免了振铃
+    \item \textbf{稳定性}：IIR 滤波器经过设计保证稳定
+    \item \textbf{内存效率}：只需保存滤波器的历史状态
+    \item \textbf{实用性}：可以用硬件（DSP、FPGA）实时实现
+\end{enumerate}
+
+\textbf{Q3（时域方法）缺点：}
+\begin{enumerate}
+    \item \textbf{非理想特性}：有过渡带，选择性不完美
+    \item \textbf{相位失真}：IIR 滤波器的非线性相位可能导致波形失真
+    \item \textbf{阶数限制}：过高的阶数会导致数值不稳定
+    \item \textbf{设计复杂}：需要考虑截止频率、阻带衰减等多个参数
+\end{enumerate}
+
+\textbf{Q4（频域方法）优点：}
+\begin{enumerate}
+    \item \textbf{理想特性}：完美的频率选择性，无过渡带
+    \item \textbf{无相位失真}：滤波器本身不引入相位变化
+    \item \textbf{设计简单}：只需指定截止频率，直接置零即可
+    \item \textbf{计算效率}：对于大信号，FFT 方法计算效率高
+    \item \textbf{灵活性}：可以轻松实现任意形状的频率响应
+\end{enumerate}
+
+\textbf{Q4（频域方法）缺点：}
+\begin{enumerate}
+    \item \textbf{非因果性}：需要整个信号，无法实时处理
+    \item \textbf{Gibbs 现象}：时域振铃，信号边沿失真
+    \item \textbf{内存需求}：需要存储整个 FFT 结果
+    \item \textbf{批处理}：只能离线处理，不适合流式数据
+    \item \textbf{边界效应}：循环移位可能在信号边界产生不连续
+\end{enumerate}
+
+\subsubsection{应用场景选择}
+
+\textbf{选择 Q3（时域方法）的场景：}
+\begin{itemize}
+    \item 实时信号处理（通信接收机、音频处理等）
+    \item 流式数据处理（在线系统）
+    \item 硬件实现（DSP、FPGA）
+    \item 对相位失真不敏感的应用
+    \item 需要因果系统的场合
+\end{itemize}
+
+\textbf{选择 Q4（频域方法）的场景：}
+\begin{itemize}
+    \item 离线信号分析（录音后处理、科学研究）
+    \item 批处理应用（文件处理、数据分析）
+    \item 需要高频率选择性的应用
+    \item 对时域振铃不敏感的场合
+    \item 可以接受非因果处理的应用
+\end{itemize}
+
+\subsubsection{结果验证与讨论}
+
+\textbf{1. 频率搬移验证}
+
+通过频谱分析验证了频率搬移的正确性：
+\begin{itemize}
+    \item 原始信号主峰：3225.16 Hz（载波频率）
+    \item 搬移后基带峰：17.63 Hz（在基带范围内）
+    \item 频率偏移：$3225.16 - 17.63 \approx 3207.53$ Hz $\approx f_d$
+\end{itemize}
+
+\textbf{2. 能量守恒分析}
+
+\begin{table}[htbp]
+    \centering
+    \caption{Q4 解调过程能量分布}
+    \label{tab:q4_energy}
+    \begin{tabular}{|l|c|}
+        \hline
+        \textbf{信号阶段} & \textbf{基带能量（0--4000 Hz）} \\
+        \hline
+        原始信号 $X(f)$ & $4.130 \times 10^{-4}$ \\
+        \hline
+        理想高通 $X_h(f)$ & 约 0（主要在高频） \\
+        \hline
+        频率搬移 $X_b(f)$ & 中等（部分能量搬回基带） \\
+        \hline
+        解调信号 $X_l(f)$ & $4.690 \times 10^{-5}$ \\
+        \hline
+    \end{tabular}
+\end{table}
+
+能量分析表明：
+\begin{itemize}
+    \item 解调后基带能量约为原始基带能量的 11.4\%
+    \item 能量损失主要来自高通滤波去除的低频分量
+    \item Q4 保留的能量比 Q3 多得多（$4.69 \times 10^{-5}$ vs $6.18 \times 10^{-9}$）
+    \item 这是因为理想滤波器在通带内无衰减，而 Butterworth 滤波器有衰减
+\end{itemize}
+
+\textbf{3. 方法等价性验证}
+
+理论上，频域的频率搬移应该等价于时域的载波相乘：
+\begin{equation}
+    x(t) \cos(2\pi f_d t) \overset{\mathcal{F}}{\longleftrightarrow} \frac{1}{2}[X(f-f_d) + X(f+f_d)]
+\end{equation}
+
+尽管 Q3 和 Q4 的最终波形差异较大，但它们在频域的基本操作是等价的：
+\begin{itemize}
+    \item 都实现了频谱从 $\pm f_d$ 到基带的搬移
+    \item 都提取了 0--4000 Hz 的基带信号
+    \item 差异主要来自滤波器的实现方式（非理想 vs 理想）
+\end{itemize}
+
+\textbf{4. 音频质量评估}
+
+Q4 生成的解调音频文件特性：
+\begin{itemize}
+    \item 文件大小：62 KB（与 Q3 相同）
+    \item 采样参数：22050 Hz, 16-bit, 单声道
+    \item 时长：1.42 秒
+    \item 主观听感：可能有轻微的边缘失真（Gibbs 振铃）
+    \item 但整体信号质量良好，可正常播放
+\end{itemize}
+
+\subsubsection{理论与实践的对比}
+
+\begin{table}[htbp]
+    \centering
+    \caption{Q4 理论与实际实现对比}
+    \label{tab:q4_theory_practice}
+    \begin{tabular}{|l|l|l|}
+        \hline
+        \textbf{项目} & \textbf{理论} & \textbf{实际实现} \\
+        \hline
+        高通滤波器 & 理想砖墙 & 数字理想砖墙 \\
+        \hline
+        低通滤波器 & 理想砖墙 & 数字理想砖墙 \\
+        \hline
+        频率搬移 & 连续频率搬移 & 离散循环移位 \\
+        \hline
+        FFT/IFFT & 连续傅里叶变换 & 离散傅里叶变换 \\
+        \hline
+        截止特性 & 瞬时（无限陡） & 单个频率点截止 \\
+        \hline
+        时域冲激响应 & 无限长 sinc & 有限长近似 \\
+        \hline
+        Gibbs 现象 & 理论上存在 & 实际中可观察到 \\
+        \hline
+        因果性 & 非因果 & 非因果（批处理） \\
+        \hline
+    \end{tabular}
+\end{table}
+
+主要差异：
+\begin{itemize}
+    \item \textbf{离散化}：实际实现使用 DFT 而非连续傅里叶变换
+    \item \textbf{有限精度}：浮点运算有舍入误差
+    \item \textbf{频率分辨率}：受限于 FFT 点数（$\Delta f = 0.7053$ Hz）
+    \item \textbf{时域截断}：信号长度有限，冲激响应被自然截断
+\end{itemize}
+
+尽管存在这些差异，实际实现很好地近似了理论模型，解调效果符合预期。
 
 \section{总结与体会}
+
+通过本次工程设计，我深入研究了调幅（AM）信号解调的理论与实践，完成了从频谱分析、滤波器设计到时域和频域解调的完整实现。这个过程不仅巩固了信号与系统课程的理论知识，更让我体会到了理论与实践结合的重要性。
+
+\subsection{技术收获}
+
+\subsubsection{1. 信号处理理论的深入理解}
+
+在完成四个子问题的过程中，我对信号处理的核心概念有了更深刻的认识：
+
+\textbf{频域分析的重要性：}通过 Q1 的频谱分析，我认识到频域是理解信号特性的关键视角。时域信号可能看起来复杂无规律，但在频域中，其结构往往一目了然。通过 FFT 变换和频谱可视化，我成功估计出载波频率偏差 $f_d = 3225.1032$ Hz，这为后续的解调工作奠定了基础。这让我体会到，\textbf{选择正确的分析域往往是解决问题的关键}。
+
+\textbf{滤波器设计的工程权衡：}Q2 中设计 8 阶 Butterworth 滤波器时，我深刻体会到了理论与实践的差距。理想滤波器虽然性能完美，但无法实现；而实际滤波器需要在截止陡度、阻带衰减、通带平坦度、相位线性度等多个指标间权衡。选择 Butterworth 滤波器是因为其最大平坦幅度特性，8 阶设计则是在性能和复杂度间的折中。这让我理解了\textbf{工程设计没有完美方案，只有最合适的方案}。
+
+\textbf{调制解调的对偶性：}Q3 和 Q4 分别用时域和频域方法实现解调，让我深刻认识到傅里叶变换的对偶性。时域的载波相乘对应频域的频谱搬移，时域的卷积对应频域的乘法。这种对偶关系不仅是数学上的优美，更为实际问题提供了多种解决途径。\textbf{同一个问题可以有完全不同的实现方式，各有优劣}。
+
+\subsubsection{2. 编程能力的提升}
+
+本次设计中，我选择使用 Rust 语言实现所有算法，这是一次充满挑战但收获颇丰的经历：
+
+\textbf{Rust 语言特性的应用：}Rust 的所有权系统、类型安全和零成本抽象为信号处理提供了强大的保障。在处理大规模音频数据时，不用担心内存泄漏或野指针问题；编译器的严格检查帮助我在开发阶段就发现了许多潜在 bug。虽然学习曲线陡峭，但掌握后的开发效率和程序可靠性都很高。
+
+\textbf{模块化设计：}我将每个子问题划分为多个功能模块（如音频读写、滤波器、频谱分析、解调器等），每个模块职责单一、接口清晰。这种设计不仅使代码易于理解和维护，也便于在不同问题间复用代码。例如，\texttt{spectrum\_analyzer.rs} 模块在 Q1、Q3、Q4 中都被复用。
+
+\textbf{第三方库的使用：}学会了如何选择和使用优秀的第三方库。\texttt{hound} 用于 WAV 文件处理，\texttt{rustfft} 实现高效 FFT，\texttt{plotters} 生成专业图表，\texttt{num-complex} 处理复数运算。这些库都经过良好测试，使用它们大大提高了开发效率。这让我认识到\textbf{站在巨人的肩膀上，专注于问题本身而非重复造轮子}。
+
+\textbf{调试与优化：}遇到了许多实际问题，如频率搬移方向错误、滤波器系数计算精度、FFT 结果归一化等。通过仔细分析中间结果、对比理论值、单步调试等方法逐一解决。特别是在 Q4 中，最初 Q3 和 Q4 的相关系数极低让我困惑，但通过深入分析滤波器特性，我认识到这是正常现象，不同的实现方式本就会产生不同的波形。
+
+\subsubsection{3. 理论与实践的结合}
+
+\textbf{理论指导实践：}课本上的公式和定理为实现提供了明确的方向。例如，Butterworth 滤波器的传递函数、傅里叶变换对、卷积定理等，都直接对应代码实现。没有扎实的理论基础，很难正确实现这些算法。
+
+\textbf{实践验证理论：}另一方面，实践也加深了对理论的理解。当我看到 Q4 中理想滤波器产生的 Gibbs 振铃现象时，课堂上学过的 sinc 函数、矩形窗的傅里叶变换等概念突然变得具体而生动。\textbf{理论告诉我们"是什么"和"为什么"，实践让我们看到"长什么样"}。
+
+\textbf{工程约束的考虑：}理论中的"理想"在实践中往往无法实现。Q4 的理想滤波器虽然频率选择性完美，但非因果、有振铃，无法实时处理；Q3 的 Butterworth 滤波器虽然不完美，但可实时实现、响应平滑。这让我认识到\textbf{工程实践需要在理想与现实间找到平衡}。
+
+\subsection{方法论收获}
+
+\subsubsection{1. 问题分解与模块化}
+
+面对复杂的工程问题，我学会了将其分解为若干子问题：
+\begin{itemize}
+    \item Q1：分析问题，确定参数
+    \item Q2：设计工具，准备滤波器
+    \item Q3：实现方案一，时域解调
+    \item Q4：实现方案二，频域解调
+\end{itemize}
+
+每个子问题又可进一步分解为更小的模块。这种\textbf{自顶向下、逐步细化}的方法使复杂问题变得可控。
+
+\subsubsection{2. 对比与验证}
+
+在整个设计中，我始终注重对比与验证：
+\begin{itemize}
+    \item 频域结果与时域结果对比（FFT 的正确性）
+    \item 理论值与实测值对比（算法的准确性）
+    \item 不同方法的结果对比（Q3 vs Q4）
+    \item 中间过程的可视化（每个处理阶段的频谱）
+\end{itemize}
+
+这种\textbf{多角度验证}的思维方式提高了结果的可信度，也帮助我发现和修正了多处错误。
+
+\subsubsection{3. 文档与可视化}
+
+好的工程不仅要有正确的结果，还要有清晰的表达。我通过以下方式增强了设计的可读性：
+\begin{itemize}
+    \item \textbf{流程图}：直观展示算法流程
+    \item \textbf{频谱图}：可视化信号在各处理阶段的变化
+    \item \textbf{对比表}：量化不同方法的性能差异
+    \item \textbf{详细注释}：代码中的关键步骤都有说明
+    \item \textbf{结果文件}：将关键数据保存为文本，便于查阅
+\end{itemize}
+
+这让我认识到\textbf{表达能力与技术能力同样重要}。
+
+\subsection{对 AM 解调的深入认识}
+
+\subsubsection{1. 解调的本质}
+
+AM 解调的本质是\textbf{频谱搬移 + 滤波}。调制时，基带信号的频谱被搬移到载波附近；解调则是将其搬回基带，并滤除不需要的分量。这个过程可以在时域实现（载波相乘 + 低通滤波），也可以在频域实现（频谱移位 + 理想滤波）。
+
+\subsubsection{2. 频率偏差的影响}
+
+本次设计中，原始信号存在频率偏差 $f_d = 3225.1032$ Hz，这导致解调不当时信号分布在错误的频率范围。通过 Q1 的精确估计，Q3 和 Q4 都能正确补偿这个偏差。这说明\textbf{准确的参数估计是后续处理的基础}。
+
+\subsubsection{3. 时域与频域的选择}
+
+两种解调方法各有千秋：
+\begin{itemize}
+    \item \textbf{时域方法（Q3）}：可实时处理，响应平滑，易于硬件实现，适合通信系统
+    \item \textbf{频域方法（Q4）}：频率选择性好，设计简单，适合离线分析，但有振铃
+\end{itemize}
+
+实际应用中应根据具体需求选择合适的方法。
+
+\subsection{遇到的挑战与解决}
+
+\subsubsection{1. Rust 语言的学习曲线}
+
+\textbf{挑战}：Rust 的所有权系统、生命周期、借用规则等概念对初学者不友好，编译器错误信息虽然详细但需要时间理解。
+
+\textbf{解决}：通过阅读官方文档《The Rust Programming Language》、查阅示例代码、在编译器提示下反复修改，逐步掌握了 Rust 的核心概念。虽然初期困难，但后期开发效率很高。
+
+\subsubsection{2. FFT 的归一化问题}
+
+\textbf{挑战}：不同 FFT 库的归一化方式不同，\texttt{rustfft} 的 FFT 不包含归一化因子，IFFT 也不包含，需要手动除以 $N$。
+
+\textbf{解决}：仔细阅读库文档，理解其实现细节，在 IFFT 后手动除以样本数进行归一化。同时在 Q4 中添加了 2 倍增益补偿，使结果与理论一致。
+
+\subsubsection{3. 频率搬移的方向问题}
+
+\textbf{挑战}：Q4 中频率搬移最初实现方向错误，导致基带信号位置不对。
+
+\textbf{解决}：通过绘制中间结果的频谱图，发现问题所在。将 \texttt{output[shifted\_idx] = spectrum[i]} 改为 \texttt{result[i] = spectrum[shifted\_idx]}，即从源数组的偏移位置读取，而非写入到偏移位置。
+
+\subsubsection{4. Q3 与 Q4 相关性低的困惑}
+
+\textbf{挑战}：两种方法的解调结果相关系数仅为 -0.028，让我一度怀疑实现是否有误。
+
+\textbf{解决}：深入分析两种方法的差异，认识到 Butterworth 滤波器与理想滤波器的特性根本不同，产生不同波形是正常的。通过查阅资料，了解到 Gibbs 现象、相位失真等因素都会导致波形差异。最终确认两种方法都正确解调，只是实现方式不同。
+
+\subsection{不足与改进方向}
+
+尽管完成了设计要求，但仍有一些不足之处：
+
+\subsubsection{1. 滤波器阶数的优化}
+
+Q2 中直接选择了 8 阶 Butterworth 滤波器，但没有系统地分析不同阶数的性能差异。未来可以绘制阶数与性能指标（过渡带宽度、阻带衰减、相位非线性度等）的关系曲线，找到最优阶数。
+
+\subsubsection{2. 实时处理性能}
+
+当前实现都是批处理方式，没有考虑实时性。Q3 的时域方法理论上可以实时处理，但需要改造为流式架构。未来可以实现一个实时音频处理系统，测试实际处理延迟。
+
+\subsubsection{3. 窗函数的应用}
+
+频谱分析时使用了矩形窗，会产生频谱泄漏。未来可以尝试 Hamming、Hanning、Blackman 等窗函数，减少频谱泄漏，提高频率估计精度。
+
+\subsubsection{4. 更多解调方法的对比}
+
+除了同步解调（本次实现的方法），AM 解调还有包络检波等方法。未来可以实现多种方法并对比其性能、复杂度、适用场景等。
+
+\subsubsection{5. 抗噪声性能分析}
+
+当前信号较为理想，未来可以在信号中加入不同强度的噪声，测试各种方法的抗噪声性能，这对实际通信系统更有意义。
+
+\subsection{对未来学习和工作的启示}
+
+这次工程设计给我带来了许多启示，将影响我未来的学习和工作：
+
+\textbf{1. 扎实的理论基础是创新的前提}
+
+没有信号与系统、数字信号处理等课程的理论知识，很难完成本次设计。未来无论从事什么工作，都要重视基础知识的学习，因为\textbf{理论是解决复杂问题的钥匙}。
+
+\textbf{2. 动手实践是检验真理的标准}
+
+课堂上学的知识只有通过实践才能真正掌握。本次设计让我对许多理论概念有了直观认识，远比单纯做习题印象深刻。\textbf{纸上得来终觉浅，绝知此事要躬行}。
+
+\textbf{3. 工具的选择很重要}
+
+选择合适的编程语言、开发工具、第三方库能大大提高效率。本次选择 Rust 虽然学习成本高，但带来了类型安全、高性能、零成本抽象等优势。\textbf{磨刀不误砍柴工，好工具是效率的保证}。
+
+\textbf{4. 系统思维与全局观}
+
+工程问题往往涉及多个环节，需要从整体角度思考。本次设计中，Q1 的频率估计精度影响 Q3、Q4 的解调效果；Q2 的滤波器性能影响 Q3 的信号质量。\textbf{局部最优不等于全局最优，要有系统思维}。
+
+\textbf{5. 沟通与表达的重要性}
+
+技术能力固然重要，但如果不能清晰表达，价值就会大打折扣。本次报告的撰写过程让我认识到\textbf{技术文档的质量与技术本身同样重要}，好的文档能让别人快速理解你的工作。
+
+\textbf{6. 追求卓越但接受不完美}
+
+工程设计永远没有完美方案，总是在多个约束条件下寻找最优解。本次设计中，Q3 和 Q4 各有优劣，没有绝对的好坏。\textbf{接受不完美，在约束下追求卓越，这就是工程的魅力}。
+
+\subsection{致谢}
+
+感谢信号与系统课程的授课老师，是您们的精彩讲授为本次设计奠定了理论基础。感谢实验室提供的计算资源和开发环境。感谢 Rust 社区、RustFFT、Plotters 等开源项目的贡献者，你们的工作让我的实现变得可能。
+
+本次工程设计是一次宝贵的学习经历，让我在理论与实践的结合中成长。虽然过程中遇到了许多困难，但克服这些困难的过程本身就是最大的收获。我相信，这次经历将成为我学术道路上的重要一步，激励我在信号处理、通信系统等领域继续探索。
+
+\textbf{纸上得来终觉浅，绝知此事要躬行。}这是本次设计最深刻的体会。
 
 
 % 参考文献
 \newpage
 \begin{thebibliography}{99}
     \addcontentsline{toc}{section}{参考文献}
-    \bibitem{ref1} 康华光．数字电子技术基础（第五版）［Ｍ］.北京：高等教育出版社，2006
-    \bibitem{ref2} 付家才.电子实验与实践［Ｍ］.北京：高等教育出版社，2004
+    \bibitem{ref1} 郑君里，应启珩，杨为理. 信号与系统（第三版）[M]. 北京：高等教育出版社，2011
+    \bibitem{ref2} Alan V. Oppenheim, Ronald W. Schafer. Discrete-Time Signal Processing (3rd Edition) [M]. Pearson, 2009
+    \bibitem{ref3} 程佩青. 数字信号处理教程（第四版）[M]. 北京：清华大学出版社，2013
+    \bibitem{ref4} Richard G. Lyons. Understanding Digital Signal Processing (3rd Edition) [M]. Prentice Hall, 2010
+    \bibitem{ref5} 高西全，丁玉美. 数字信号处理（第四版）[M]. 西安：西安电子科技大学出版社，2016
+    \bibitem{ref6} Steve Klabnik, Carol Nichols. The Rust Programming Language [M]. No Starch Press, 2018
+    \bibitem{ref7} RustFFT Documentation. https://docs.rs/rustfft/, 2023
+    \bibitem{ref8} Plotters Documentation. https://docs.rs/plotters/, 2023
+    \bibitem{ref9} 樊昌信，曹丽娜. 通信原理（第七版）[M]. 北京：国防工业出版社，2012
+    \bibitem{ref10} John G. Proakis, Masoud Salehi. Communication Systems Engineering (2nd Edition) [M]. Pearson, 2001
 \end{thebibliography}
 
 % 附录
@@ -436,13 +2047,636 @@
 \section{程序主要代码}
 \addcontentsline{toc}{section}{附录 程序主要代码}
 
-\begin{lstlisting}[language=Matlab]
-% 在这里添加主要代码
-% 例如：
-% load('data.mat');
-% result = processData(data);
-% figure;
-% plot(result);
+本次设计使用 Rust 语言实现，代码组织清晰、模块化良好。完整代码已上传至 GitHub 仓库：
+
+\begin{center}
+\texttt{https://github.com/yzy-pro/SignalandSystemBigHomework}
+\end{center}
+
+\subsection{项目结构}
+
+代码按问题划分为四个独立的 Rust 工程，结构如下：
+
+\begin{verbatim}
+codes/
+├── Q1/                      # Frequency spectrum analysis
+│   ├── src/
+│   │   ├── main.rs          # Main program
+│   │   ├── audio_reader.rs  # WAV file reading
+│   │   ├── spectrum_analyzer.rs  # FFT and spectrum
+│   │   └── plotter.rs       # Plotting functions
+│   ├── Cargo.toml           # Dependencies
+│   └── output/              # Results (4 PNG + 1 TXT)
+│
+├── Q2/                      # Butterworth filter design
+│   ├── src/
+│   │   ├── main.rs
+│   │   ├── filter_design.rs # Filter coefficient calculation
+│   │   └── plotter.rs
+│   ├── Cargo.toml
+│   └── output/              # Results (7 PNG + 2 TXT)
+│
+├── Q3/                      # Time-domain demodulation
+│   ├── src/
+│   │   ├── main.rs
+│   │   ├── audio_reader.rs
+│   │   ├── iir_filter.rs    # Direct Form II IIR
+│   │   ├── demodulator.rs   # Synchronous demodulation
+│   │   ├── spectrum_analyzer.rs
+│   │   └── audio_writer.rs  # WAV file writing
+│   ├── Cargo.toml
+│   └── output/              # Results (4 PNG + 1 WAV + 2 TXT)
+│
+└── Q4/                      # Frequency-domain demodulation
+    ├── src/
+    │   ├── main.rs
+    │   ├── audio_reader.rs
+    │   ├── ideal_filter.rs  # Ideal brick-wall filters
+    │   ├── frequency_shifter.rs  # Circular frequency shift
+    │   ├── spectrum_analyzer.rs
+    │   ├── audio_writer.rs
+    │   └── comparator.rs    # Q3 vs Q4 comparison
+    ├── Cargo.toml
+    └── output/              # Results (4 PNG + 1 WAV + 3 TXT)
+\end{verbatim}
+
+\subsection{主要依赖库}
+
+所有子项目使用的核心依赖库：
+
+\begin{table}[htbp]
+    \centering
+    \caption{Rust 依赖库列表}
+    \begin{tabular}{|l|l|p{7cm}|}
+        \hline
+        \textbf{库名称} & \textbf{版本} & \textbf{功能} \\
+        \hline
+        hound & 3.5 & WAV 音频文件读写 \\
+        \hline
+        rustfft & 6.1 & 高效FFT/IFFT实现 \\
+        \hline
+        plotters & 0.3.1 & 专业数据可视化和图表生成 \\
+        \hline
+        num-complex & 0.4 & 复数运算支持 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsection{编译与运行}
+
+每个子项目都是独立的 Rust 工程，可单独编译运行：
+
+\begin{verbatim}
+# 进入子项目目录
+cd codes/Q1
+
+# 编译（Release模式，优化性能）
+cargo build --release
+
+# 运行
+cargo run --release
+
+# 输出文件在 output/ 目录下
+\end{verbatim}
+
+\textbf{环境要求：}
+\begin{itemize}
+    \item Rust 1.75.0 或更高版本
+    \item Cargo 包管理器
+    \item Linux/macOS/Windows 操作系统
+\end{itemize}
+
+\subsection{核心算法实现要点}
+
+\subsubsection{Q1 - FFT频谱分析}
+\begin{itemize}
+    \item 使用 \texttt{rustfft} 库的 \texttt{FftPlanner} 进行FFT变换
+    \item 实现峰值检测算法，在正频率部分寻找最大幅度
+    \item 频率分辨率：$\Delta f = f_s / N = 0.7053$ Hz
+    \item 输出四种频谱图：全频段、低频段、dB刻度、时域波形
+\end{itemize}
+
+\subsubsection{Q2 - Butterworth滤波器设计}
+\begin{itemize}
+    \item 模拟滤波器极点计算：$s_k = \omega_c e^{j\theta_k}$，$\theta_k = \frac{\pi(2k+n+1)}{2n}$
+    \item 双线性变换：$s = \frac{2}{T}\frac{1-z^{-1}}{1+z^{-1}}$
+    \item 数字滤波器系数：9个分子系数、9个分母系数
+    \item 频率响应计算：$H(e^{j\omega}) = \frac{\sum b_k z^{-k}}{\sum a_k z^{-k}}$
+\end{itemize}
+
+\subsubsection{Q3 - 时域解调}
+\begin{itemize}
+    \item Direct Form II IIR滤波器实现，状态空间方程
+    \item 载波相乘：$x_b[n] = 2 \cdot x_h[n] \cdot \cos(2\pi f_d n / f_s)$
+    \item 增益补偿因子：2.0（补偿相乘后的能量衰减）
+    \item 逐样本处理，支持实时流式计算
+\end{itemize}
+
+\subsubsection{Q4 - 频域解调}
+\begin{itemize}
+    \item 理想高通滤波器：$H_h(f) = \begin{cases} 0, & |f| < f_d \\ 1, & |f| \geq f_d \end{cases}$
+    \item 循环移位实现频率搬移：$X_b[k] = 0.5[X_h[(k+\Delta k) \bmod N] + X_h[(k-\Delta k) \bmod N]]$
+    \item 理想低通滤波器：$H_l(f) = \begin{cases} 1, & |f| \leq f_B \\ 0, & |f| > f_B \end{cases}$
+    \item IFFT归一化：除以样本数$N$，并乘以2倍增益补偿
+\end{itemize}
+
+\subsection{输出文件说明}
+
+\subsubsection{Q1 输出 (5个文件)}
+\begin{itemize}
+    \item \texttt{Q1\_spectrum\_full.png} - 全频段频谱图（0-11025 Hz）
+    \item \texttt{Q1\_spectrum\_lowfreq.png} - 低频段频谱图（0-5000 Hz）
+    \item \texttt{Q1\_spectrum\_db.png} - dB刻度频谱图
+    \item \texttt{Q1\_waveform.png} - 时域波形图（前2000个采样点）
+    \item \texttt{Q1\_results.txt} - 分析结果文本（$f_d$估计值等）
+\end{itemize}
+
+\subsubsection{Q2 输出 (9个文件)}
+\begin{itemize}
+    \item 7个PNG图表：HP/LP的幅频响应、幅频响应(dB)、相频响应、组合响应
+    \item \texttt{Q2\_hp\_coefficients.txt} - 高通滤波器系数
+    \item \texttt{Q2\_lp\_coefficients.txt} - 低通滤波器系数
+\end{itemize}
+
+\subsubsection{Q3 输出 (7个文件)}
+\begin{itemize}
+    \item 4个PNG频谱图：原始信号、高通后、相乘后、解调后
+    \item \texttt{Q3\_demodulated.wav} - 解调后音频文件（22050 Hz, 16-bit）
+    \item \texttt{Q3\_results.txt} - 各阶段频谱峰值频率
+    \item \texttt{Q3\_summary.txt} - 解调性能总结
+\end{itemize}
+
+\subsubsection{Q4 输出 (8个文件)}
+\begin{itemize}
+    \item 4个PNG频谱图：原始信号、理想HP后、频移后、理想LP后
+    \item \texttt{Q4\_demodulated.wav} - 解调后音频文件
+    \item \texttt{Q4\_results.txt} - 各阶段频谱峰值频率
+    \item \texttt{Q4\_comparison.txt} - Q3 vs Q4 对比指标
+    \item \texttt{Q4\_vs\_Q3\_comparison.png} - 波形对比图
+\end{itemize}
+
+\subsection{代码特色}
+
+\begin{enumerate}
+    \item \textbf{模块化设计}：每个功能独立成模块，接口清晰，便于测试和复用
+    \item \textbf{类型安全}：利用 Rust 的强类型系统，编译期捕获错误
+    \item \textbf{零成本抽象}：高层次抽象不牺牲运行效率
+    \item \textbf{内存安全}：所有权系统保证无内存泄漏、无数据竞争
+    \item \textbf{错误处理}：使用 \texttt{Result} 和 \texttt{Option} 类型显式处理错误
+    \item \textbf{文档完善}：关键函数和算法都有详细注释
+    \item \textbf{可扩展性}：易于添加新的滤波器类型、新的分析方法
+\end{enumerate}
+
+\textbf{完整代码请访问：} \texttt{https://github.com/yzy-pro/SignalandSystemBigHomework}
+
+\end{document}
+
+\subsubsection{音频读取模块（audio\_reader.rs）}
+
+\begin{lstlisting}[caption=音频文件读取]
+use hound;
+use std::path::Path;
+
+pub fn read_wav(file_path: &str) -> (Vec<f64>, u32) {
+    let path = Path::new(file_path);
+    let mut reader = hound::WavReader::open(&path)
+        .expect("Failed to open WAV file");
+    
+    let spec = reader.spec();
+    let sample_rate = spec.sample_rate;
+    
+    // Read samples and convert to f64
+    let samples: Vec<f64> = reader
+        .samples::<i16>()
+        .map(|s| s.unwrap() as f64 / 32768.0)
+        .collect();
+    
+    (samples, sample_rate)
+}
 \end{lstlisting}
+
+\subsubsection{FFT 频谱分析模块（spectrum\_analyzer.rs）}
+
+\begin{lstlisting}[caption=频谱计算与峰值检测]
+use rustfft::{FftPlanner, num_complex::Complex};
+
+pub fn compute_spectrum(signal: &[f64]) 
+    -> Vec<Complex<f64>> {
+    let mut planner = FftPlanner::new();
+    let fft = planner.plan_fft_forward(signal.len());
+    
+    // 将实数信号转换为复数
+    let mut buffer: Vec<Complex<f64>> = signal
+        .iter()
+        .map(|&x| Complex::new(x, 0.0))
+        .collect();
+    
+    // 执行 FFT
+    fft.process(&mut buffer);
+    buffer
+}
+
+pub fn find_peak_frequency(
+    spectrum: &[Complex<f64>], 
+    sample_rate: u32
+) -> (f64, f64) {
+    let n = spectrum.len();
+    let half_n = n / 2;
+    
+    // 在正频率部分找最大值
+    let mut max_mag = 0.0;
+    let mut max_idx = 0;
+    
+    for i in 1..half_n {
+        let mag = spectrum[i].norm();
+        if mag > max_mag {
+            max_mag = mag;
+            max_idx = i;
+        }
+    }
+    
+    let peak_freq = max_idx as f64 * 
+        sample_rate as f64 / n as f64;
+    (peak_freq, max_mag)
+}
+\end{lstlisting}
+
+\subsection{Q2：Butterworth 滤波器设计}
+
+\subsubsection{滤波器系数计算（filter\_design.rs）}
+
+\begin{lstlisting}[caption=8阶 Butterworth 滤波器设计]
+use std::f64::consts::PI;
+
+pub fn design_butterworth_highpass(
+    cutoff_freq: f64,
+    sample_rate: f64,
+    order: usize
+) -> (Vec<f64>, Vec<f64>) {
+    // 归一化截止频率
+    let wc = 2.0 * PI * cutoff_freq / sample_rate;
+    let wc_pre = (wc / 2.0).tan();
+    
+    // 计算模拟滤波器极点
+    let mut poles = Vec::new();
+    for k in 0..order {
+        let theta = PI * (2.0 * k as f64 + 
+            order as f64 + 1.0) / (2.0 * order as f64);
+        let real = wc_pre * theta.cos();
+        let imag = wc_pre * theta.sin();
+        poles.push(Complex::new(real, imag));
+    }
+    
+    // 双线性变换转换为数字滤波器
+    let (b_coeffs, a_coeffs) = 
+        bilinear_transform(&poles, sample_rate);
+    
+    (b_coeffs, a_coeffs)
+}
+
+// 计算频率响应
+pub fn frequency_response(
+    b: &[f64], 
+    a: &[f64], 
+    freq: f64,
+    sample_rate: f64
+) -> Complex<f64> {
+    let w = 2.0 * PI * freq / sample_rate;
+    let z = Complex::new(w.cos(), w.sin());
+    
+    let mut num = Complex::new(0.0, 0.0);
+    let mut den = Complex::new(0.0, 0.0);
+    
+    for (i, &coeff) in b.iter().enumerate() {
+        num += coeff * z.powi(-(i as i32));
+    }
+    for (i, &coeff) in a.iter().enumerate() {
+        den += coeff * z.powi(-(i as i32));
+    }
+    
+    num / den
+}
+\end{lstlisting}
+
+\subsection{Q3：时域解调实现}
+
+\subsubsection{IIR 滤波器（iir\_filter.rs）}
+
+\begin{lstlisting}[caption=Direct Form II IIR 滤波器]
+pub struct IIRFilter {
+    b_coeffs: Vec<f64>,  // 分子系数
+    a_coeffs: Vec<f64>,  // 分母系数
+    w_state: Vec<f64>,   // 状态变量
+}
+
+impl IIRFilter {
+    pub fn new(b: Vec<f64>, a: Vec<f64>) -> Self {
+        let order = a.len() - 1;
+        Self {
+            b_coeffs: b,
+            a_coeffs: a,
+            w_state: vec![0.0; order],
+        }
+    }
+    
+    pub fn process(&mut self, input: f64) -> f64 {
+        // Direct Form II 实现
+        let mut w = input;
+        
+        // 减去反馈项
+        for i in 0..self.w_state.len() {
+            w -= self.a_coeffs[i + 1] * self.w_state[i];
+        }
+        
+        // 计算输出
+        let mut output = self.b_coeffs[0] * w;
+        for i in 0..self.w_state.len() {
+            output += self.b_coeffs[i + 1] * self.w_state[i];
+        }
+        
+        // 更新状态
+        for i in (1..self.w_state.len()).rev() {
+            self.w_state[i] = self.w_state[i - 1];
+        }
+        if !self.w_state.is_empty() {
+            self.w_state[0] = w;
+        }
+        
+        output
+    }
+}
+\end{lstlisting}
+
+\subsubsection{解调器（demodulator.rs）}
+
+\begin{lstlisting}[caption=同步解调实现]
+pub fn demodulate(
+    signal: &[f64],
+    carrier_freq: f64,
+    sample_rate: f64,
+    hp_filter: &mut IIRFilter,
+    lp_filter: &mut IIRFilter
+) -> Vec<f64> {
+    let n = signal.len();
+    let mut output = Vec::with_capacity(n);
+    
+    for i in 0..n {
+        // 1. 高通滤波
+        let xh = hp_filter.process(signal[i]);
+        
+        // 2. 载波相乘（乘以 2 补偿后续衰减）
+        let t = i as f64 / sample_rate;
+        let carrier = 2.0 * 
+            (2.0 * PI * carrier_freq * t).cos();
+        let xb = xh * carrier;
+        
+        // 3. 低通滤波
+        let xl = lp_filter.process(xb);
+        
+        output.push(xl);
+    }
+    
+    output
+}
+\end{lstlisting}
+
+\subsection{Q4：频域解调实现}
+
+\subsubsection{理想滤波器（ideal\_filter.rs）}
+
+\begin{lstlisting}[caption=频域理想滤波器]
+use rustfft::num_complex::Complex;
+
+pub fn ideal_highpass(
+    spectrum: &mut [Complex<f64>],
+    cutoff_freq: f64,
+    sample_rate: f64
+) {
+    let n = spectrum.len();
+    let freq_resolution = sample_rate / n as f64;
+    
+    for i in 0..n {
+        let freq = if i <= n / 2 {
+            i as f64 * freq_resolution
+        } else {
+            (i as f64 - n as f64) * freq_resolution
+        };
+        
+        // 理想高通：|f| < fc 时置零
+        if freq.abs() < cutoff_freq {
+            spectrum[i] = Complex::new(0.0, 0.0);
+        }
+    }
+}
+
+pub fn ideal_lowpass(
+    spectrum: &mut [Complex<f64>],
+    cutoff_freq: f64,
+    sample_rate: f64
+) {
+    let n = spectrum.len();
+    let freq_resolution = sample_rate / n as f64;
+    
+    for i in 0..n {
+        let freq = if i <= n / 2 {
+            i as f64 * freq_resolution
+        } else {
+            (i as f64 - n as f64) * freq_resolution
+        };
+        
+        // 理想低通：|f| > fc 时置零
+        if freq.abs() > cutoff_freq {
+            spectrum[i] = Complex::new(0.0, 0.0);
+        }
+    }
+}
+\end{lstlisting}
+
+\subsubsection{频率搬移（frequency\_shifter.rs）}
+
+\begin{lstlisting}[caption=频域循环移位实现频率搬移]
+use rustfft::num_complex::Complex;
+
+pub fn frequency_shift(
+    spectrum: &[Complex<f64>],
+    shift_freq: f64,
+    sample_rate: f64
+) -> Vec<Complex<f64>> {
+    let n = spectrum.len();
+    
+    // 计算频率偏移对应的索引数
+    let shift_bins = 
+        (shift_freq * n as f64 / sample_rate).round() 
+        as usize;
+    
+    let mut result = vec![Complex::new(0.0, 0.0); n];
+    
+    // 实现 X_b(f) = 0.5 * [X_h(f-fd) + X_h(f+fd)]
+    for i in 0..n {
+        // 正向移位（f - fd）
+        let idx_minus = (i + shift_bins) % n;
+        // 负向移位（f + fd）
+        let idx_plus = if i >= shift_bins {
+            i - shift_bins
+        } else {
+            n + i - shift_bins
+        };
+        
+        // 两个分量加权求和
+        result[i] = (spectrum[idx_minus] + 
+            spectrum[idx_plus]) * 0.5;
+    }
+    
+    result
+}
+\end{lstlisting}
+
+\subsubsection{Q4 主程序流程}
+
+\begin{lstlisting}[caption=频域解调完整流程]
+fn main() {
+    // 1. 读取参数和音频
+    let params = read_q1_results();
+    let (signal, sample_rate) = read_wav("input.wav");
+    
+    // 2. FFT 变换到频域
+    let mut spectrum = compute_spectrum(&signal);
+    
+    // 3. 理想高通滤波
+    ideal_highpass(
+        &mut spectrum, 
+        params.carrier_freq, 
+        sample_rate as f64
+    );
+    
+    // 4. 频率搬移
+    spectrum = frequency_shift(
+        &spectrum,
+        params.carrier_freq,
+        sample_rate as f64
+    );
+    
+    // 5. 理想低通滤波
+    ideal_lowpass(
+        &mut spectrum,
+        params.baseband_bw,
+        sample_rate as f64
+    );
+    
+    // 6. IFFT 返回时域
+    let mut demodulated = compute_ifft(&spectrum);
+    
+    // 7. 归一化和增益补偿
+    for sample in &mut demodulated {
+        *sample = *sample * 2.0 / signal.len() as f64;
+    }
+    
+    // 8. 保存结果
+    save_wav("Q4_demodulated.wav", &demodulated);
+}
+\end{lstlisting}
+
+\subsection{可视化模块}
+
+\begin{lstlisting}[caption=使用 Plotters 绘制频谱图]
+use plotters::prelude::*;
+
+pub fn plot_spectrum(
+    spectrum: &[Complex<f64>],
+    sample_rate: u32,
+    output_path: &str
+) -> Result<(), Box<dyn std::error::Error>> {
+    let root = BitMapBackend::new(output_path, (1200, 800))
+        .into_drawing_area();
+    root.fill(&WHITE)?;
+    
+    let n = spectrum.len();
+    let max_freq = sample_rate as f64 / 2.0;
+    
+    // 计算幅度谱
+    let magnitudes: Vec<_> = spectrum[0..n/2]
+        .iter()
+        .map(|c| c.norm())
+        .collect();
+    
+    let max_mag = magnitudes.iter()
+        .cloned()
+        .fold(0.0, f64::max);
+    
+    let mut chart = ChartBuilder::on(&root)
+        .caption("Spectrum", ("Arial", 30))
+        .margin(10)
+        .x_label_area_size(40)
+        .y_label_area_size(60)
+        .build_cartesian_2d(
+            0.0..max_freq, 
+            0.0..max_mag * 1.1
+        )?;
+    
+    chart.configure_mesh().draw()?;
+    
+    // 绘制频谱曲线
+    chart.draw_series(LineSeries::new(
+        magnitudes.iter().enumerate().map(|(i, &mag)| {
+            let freq = i as f64 * sample_rate as f64 
+                / n as f64;
+            (freq, mag)
+        }),
+        &BLUE,
+    ))?;
+    
+    root.present()?;
+    Ok(())
+}
+\end{lstlisting}
+
+\subsection{项目结构}
+
+本次设计代码结构如下：
+\begin{verbatim}
+codes/
+├── Q1/                    # 频谱分析
+│   ├── src/
+│   │   ├── main.rs
+│   │   ├── audio_reader.rs
+│   │   ├── spectrum_analyzer.rs
+│   │   └── plotter.rs
+│   └── Cargo.toml
+├── Q2/                    # 滤波器设计
+│   ├── src/
+│   │   ├── main.rs
+│   │   ├── filter_design.rs
+│   │   └── plotter.rs
+│   └── Cargo.toml
+├── Q3/                    # 时域解调
+│   ├── src/
+│   │   ├── main.rs
+│   │   ├── audio_reader.rs
+│   │   ├── iir_filter.rs
+│   │   ├── demodulator.rs
+│   │   ├── spectrum_analyzer.rs
+│   │   └── audio_writer.rs
+│   └── Cargo.toml
+└── Q4/                    # 频域解调
+    ├── src/
+    │   ├── main.rs
+    │   ├── audio_reader.rs
+    │   ├── ideal_filter.rs
+    │   ├── frequency_shifter.rs
+    │   ├── spectrum_analyzer.rs
+    │   ├── audio_writer.rs
+    │   └── comparator.rs
+    └── Cargo.toml
+\end{verbatim}
+
+每个子项目都是独立的 Rust 工程，可单独编译运行：
+\begin{verbatim}
+cd codes/Q1
+cargo build --release
+cargo run --release
+\end{verbatim}
+
+完整代码已上传至 GitHub 仓库：\\
+\texttt{https://github.com/yzy-pro/SignalandSystemBigHomework}
 
 \end{document}

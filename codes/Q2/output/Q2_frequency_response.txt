@@ -1,0 +1,13 @@
+=== Q2: Frequency Response Data ===
+
+High-pass Filter:
+Number of frequency points: 15633
+Frequency range: 0 - 11024.65 Hz
+Maximum magnitude: 1.000000
+Minimum magnitude: 0.000000
+
+Low-pass Filter:
+Number of frequency points: 15633
+Frequency range: 0 - 11024.65 Hz
+Maximum magnitude: 1.000000
+Minimum magnitude: 0.000000

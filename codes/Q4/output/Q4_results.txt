@@ -1,0 +1,23 @@
+Q4 Frequency-Domain Demodulation Results
+==========================================
+
+Carrier frequency: f_d = 3225.1032 Hz
+Sampling frequency: f_s = 22050.0000 Hz
+Baseband bandwidth: f_B = 4000.0000 Hz
+
+Spectral Analysis:
+------------------
+Original signal X(f) peak: f = 3225.16 Hz, magnitude = 0.003444
+After ideal high-pass X_h(f) peak: f = 3225.16 Hz, magnitude = 0.003444
+After frequency shift X_b(f) peak: f = 17.63 Hz, magnitude = 0.000970
+Demodulated signal X_l(f) peak: f = 17.63 Hz, magnitude = 0.000970
+
+Energy analysis (0-4000 Hz band):
+  Original signal energy: 4.129585e-4
+  Demodulated signal energy: 4.689665e-5
+
+Method characteristics:
+  - Uses ideal filters (brick-wall response)
+  - Frequency-domain processing (no time-domain convolution)
+  - Perfect frequency selectivity
+  - No phase distortion from filters

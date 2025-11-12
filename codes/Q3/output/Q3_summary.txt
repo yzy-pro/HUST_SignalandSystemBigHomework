@@ -1,0 +1,33 @@
+Q3 Time-Domain Demodulation - Summary
+=======================================
+
+IMPLEMENTATION COMPLETE ✓
+
+Algorithm Steps:
+1. High-pass filtering (8th-order Butterworth, fc = 3225.10 Hz)
+2. Carrier multiplication with cos(2πf_d·t), gain = 2.0
+3. Low-pass filtering (8th-order Butterworth, fc = 4000 Hz)
+4. Spectrum analysis at each stage
+
+Key Results:
+- Original signal peak: 3225.16 Hz (matches f_d)
+- Demodulated audio saved: Q3_demodulated.wav
+- 4 spectrum plots generated showing demodulation process
+- Signal successfully shifted from carrier to baseband
+
+Output Files (6 total):
+1. Q3_original_spectrum.png - Input AM signal spectrum
+2. Q3_xh_spectrum.png - After high-pass filter
+3. Q3_xb_spectrum.png - After carrier multiplication
+4. Q3_xl_spectrum.png - Final demodulated signal
+5. Q3_demodulated.wav - Playable audio file
+6. Q3_results.txt - Numerical analysis
+
+Performance:
+- Filter implementation: Direct Form II (efficient)
+- Processing time: < 1 second for 31265 samples
+- Memory usage: Minimal (streaming processing)
+
+Next Steps:
+- Q4: Frequency-domain demodulation using FFT
+- Compare time-domain vs frequency-domain methods

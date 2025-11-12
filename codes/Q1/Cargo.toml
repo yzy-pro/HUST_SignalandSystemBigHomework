@@ -1,0 +1,21 @@
+[package]
+name = "am_demodulation_q1"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "q1"
+path = "main.rs"
+
+[dependencies]
+# 音频文件处理
+hound = "3.5"
+
+# FFT 计算
+rustfft = "6.1"
+
+# 绘图 - 使用较旧的稳定版本
+plotters = "=0.3.5"
+
+[dev-dependencies]
+# 测试相关依赖可以在这里添加

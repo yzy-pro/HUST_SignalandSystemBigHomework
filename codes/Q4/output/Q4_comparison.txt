@@ -1,0 +1,27 @@
+Q4 vs Q3 Comparison Results
+============================
+
+Mean Squared Error (MSE): 5.544647e-3
+Root Mean Squared Error (RMSE): 7.446239e-2
+Maximum absolute difference: 0.964926
+Correlation coefficient: -0.027949
+Signal-to-Noise Ratio: -12.28 dB
+
+Interpretation:
+---------------
+✗ Low correlation - significant differences
+~ Low SNR - noticeable difference
+
+Method differences:
+-------------------
+Q3 (Time-domain):
+  - Uses 8th-order Butterworth filters (non-ideal)
+  - IIR filter implementation (Direct Form II)
+  - Non-linear phase response
+  - Gradual transition band
+
+Q4 (Frequency-domain):
+  - Uses ideal brick-wall filters
+  - Frequency-domain multiplication
+  - No phase distortion from filters
+  - Sharp cutoff
