@@ -1,11 +1,11 @@
 Q4 vs Q3 Comparison Results
 ============================
 
-Mean Squared Error (MSE): 5.544647e-3
-Root Mean Squared Error (RMSE): 7.446239e-2
-Maximum absolute difference: 0.964926
-Correlation coefficient: -0.027949
-Signal-to-Noise Ratio: -12.28 dB
+Mean Squared Error (MSE): 4.738559e-2
+Root Mean Squared Error (RMSE): 2.176823e-1
+Maximum absolute difference: 0.905940
+Correlation coefficient: 0.740998
+Signal-to-Noise Ratio: -21.59 dB
 
 Interpretation:
 ---------------
