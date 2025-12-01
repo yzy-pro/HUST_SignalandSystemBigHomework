@@ -2,6 +2,7 @@
 name = "q2_filter_design"
 version = "0.1.0"
 edition = "2021"
+default-run = "q2"
 
 [dependencies]
 num-complex = "0.4"
@@ -9,8 +10,8 @@ plotters = "=0.3.5"
 
 [[bin]]
 name = "q2"
-path = "main.rs"
+path = "src/main.rs"
 
 [[bin]]
 name = "test_cutoff"
-path = "test_cutoff.rs"
+path = "src/test_cutoff.rs"

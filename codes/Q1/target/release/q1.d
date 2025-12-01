@@ -1,1 +1,1 @@
-/home/yzy/code/SS/codes/Q1/target/release/q1: /home/yzy/code/SS/codes/Q1/audio_reader.rs /home/yzy/code/SS/codes/Q1/fft_processor.rs /home/yzy/code/SS/codes/Q1/frequency_estimator.rs /home/yzy/code/SS/codes/Q1/main.rs /home/yzy/code/SS/codes/Q1/spectrum_visualizer.rs
+/home/yzy/code/SS/codes/Q1/target/release/q1: /home/yzy/code/SS/codes/Q1/src/audio_reader.rs /home/yzy/code/SS/codes/Q1/src/fft_processor.rs /home/yzy/code/SS/codes/Q1/src/frequency_estimator.rs /home/yzy/code/SS/codes/Q1/src/main.rs /home/yzy/code/SS/codes/Q1/src/spectrum_visualizer.rs

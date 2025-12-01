@@ -2,10 +2,11 @@
 name = "am_demodulation_q1"
 version = "0.1.0"
 edition = "2021"
+default-run = "q1"
 
 [[bin]]
 name = "q1"
-path = "main.rs"
+path = "src/main.rs"
 
 [dependencies]
 # 音频文件处理
