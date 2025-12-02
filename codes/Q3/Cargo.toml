@@ -2,9 +2,18 @@
 name = "q3_time_domain_demodulation"
 version = "0.1.0"
 edition = "2021"
+default-run = "q3_time_domain_demodulation"
 
 [dependencies]
 hound = "3.5"
 rustfft = "6.1"
 plotters = "=0.3.1"
 num-complex = "0.4"
+
+[[bin]]
+name = "q3_time_domain_demodulation"
+path = "src/main.rs"
+
+[[bin]]
+name = "q3_error_analysis"
+path = "src/error_main.rs"
